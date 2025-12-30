@@ -42,6 +42,15 @@ services:
       - backend_nuget:/root/.nuget/packages
     command: >
       sh -c "
+        echo 'Installing dotnet-ef tool...' &&
+        dotnet tool install --global dotnet-ef --version 10.* 2>/dev/null || echo 'dotnet-ef already installed' &&
+        export PATH=\"$PATH:/root/.dotnet/tools\" &&
+        echo 'Waiting for database to be ready...' &&
+        until dotnet ef database update --project LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj --startup-project LifeSprint.Api/LifeSprint.Api.csproj 2>/dev/null; do
+          echo 'Database not ready yet, retrying in 2 seconds...' &&
+          sleep 2
+        done &&
+        echo 'Migrations applied successfully!' &&
         cd LifeSprint.Api &&
         dotnet watch run --no-hot-reload
       "
