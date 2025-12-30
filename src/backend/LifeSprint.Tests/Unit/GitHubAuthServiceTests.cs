@@ -50,7 +50,7 @@ public class GitHubAuthServiceTests
         url.Should().Contain("https://github.com/login/oauth/authorize");
         url.Should().Contain("client_id=test_client_id");
         url.Should().Contain($"state={state}");
-        url.Should().Contain("scope=read:user%20user:email");
+        url.Should().Contain("scope=read%3Auser%20user%3Aemail"); // URL-encoded: : becomes %3A, space becomes %20
     }
 
     [Fact]
