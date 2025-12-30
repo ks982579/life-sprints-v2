@@ -7,56 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Pre-Release - Project Setup
-
-#### Added - Infrastructure
-- Project monorepo structure with `src/backend`, `src/frontend`, `src/nginx`
-- `.gitignore` for .NET, Node.js, and Docker
-- `.env.example` template for environment variables
-- `README.md` with comprehensive setup instructions
-
-#### Added - Backend (.NET 10)
-- .NET solution with 4 projects:
-  - `LifeSprint.Api` - ASP.NET Core Web API
-  - `LifeSprint.Core` - Domain models and interfaces
-  - `LifeSprint.Infrastructure` - EF Core, repositories, services
-  - `LifeSprint.Tests` - xUnit tests (unit + integration)
-- Database models:
-  - `Activity` - Task/project entity with hierarchy and backlog flags
-  - `User` - GitHub OAuth user entity
-  - `Session` - Authentication session entity
-- Entity Framework Core setup:
-  - `AppDbContext` with full entity configuration
-  - Automatic timestamp management (CreatedAt, UpdatedAt)
-  - Indexes for performance optimization
-  - Initial database migration
-- NuGet packages:
-  - Npgsql.EntityFrameworkCore.PostgreSQL 10.0.0
-  - Microsoft.EntityFrameworkCore.Design 10.0.1
-  - Moq 4.20.72 (testing)
-  - FluentAssertions 8.8.0 (testing)
-  - Microsoft.EntityFrameworkCore.InMemory 10.0.1 (testing)
-- API configuration:
-  - CORS setup for frontend communication
-  - Controller support
-  - Connection string configuration
-
-#### Added - Frontend (React + TypeScript + SWC)
-- Vite project with React and TypeScript
-- SWC compiler for faster builds (Rust-based)
+### Next Up - Phase 2: Authentication
+- GitHub OAuth integration
+- Backend authentication services and controllers
+- Frontend auth context and protected routes
 
 ---
 
 ## Roadmap / TODO
 
-### Phase 1: Docker & Local Development (Next Up)
-- [ ] Create backend Dockerfile (multi-stage build)
-- [ ] Create frontend Dockerfile (production build)
-- [ ] Create NGINX configuration and Dockerfile
-- [ ] Create `docker-compose.yml` for local development
-- [ ] Create `docker-compose.prod.yml` for production
-- [ ] Test full Docker environment
-- [ ] **Tag: v0.0.1 - Initial Setup Complete**
+### Phase 1: Docker & Local Development ✅ COMPLETED
+- [x] Create backend Dockerfile (multi-stage build)
+- [x] Create frontend Dockerfile (production build)
+- [x] Create NGINX configuration and Dockerfile
+- [x] Create `docker-compose.yml` for local development
+- [x] Create `docker-compose.prod.yml` for production
+- [x] Test full Docker environment
+- [x] **Tag: v0.0.1 - Initial Setup Complete**
 
 ### Phase 2: Authentication (Week 2)
 - [ ] GitHub OAuth integration
@@ -146,16 +113,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-### [0.0.1] - TBD - Initial Setup
-- Initial project setup complete
-- Backend structure with database models
-- Frontend initialized with Vite + React + TypeScript
-- Docker development environment ready
+### [0.0.1] - 2024-12-30 - Initial Setup Complete
+
+#### Added - Infrastructure
+- Project monorepo structure with `src/backend`, `src/frontend`, `src/nginx`
+- `.gitignore` for .NET, Node.js, and Docker
+- `.env.example` template for environment variables
+- `README.md` with comprehensive setup instructions
+- `CHANGELOG.md` for version tracking
+
+#### Added - Backend (.NET 10)
+- .NET solution with 4 projects:
+  - `LifeSprint.Api` - ASP.NET Core Web API
+  - `LifeSprint.Core` - Domain models and interfaces
+  - `LifeSprint.Infrastructure` - EF Core, repositories, services
+  - `LifeSprint.Tests` - xUnit tests (unit + integration)
+- Database models:
+  - `Activity` - Task/project entity with hierarchy and backlog flags
+  - `User` - GitHub OAuth user entity
+  - `Session` - Authentication session entity
+- Entity Framework Core setup:
+  - `AppDbContext` with full entity configuration
+  - Automatic timestamp management (CreatedAt, UpdatedAt)
+  - Indexes for performance optimization
+  - Initial database migration (`InitialCreate`)
+- NuGet packages:
+  - Npgsql.EntityFrameworkCore.PostgreSQL 10.0.0
+  - Microsoft.EntityFrameworkCore.Design 10.0.1
+  - Moq 4.20.72 (testing)
+  - FluentAssertions 8.8.0 (testing)
+  - Microsoft.EntityFrameworkCore.InMemory 10.0.1 (testing)
+- API configuration:
+  - CORS setup for frontend communication
+  - Controller support
+  - Connection string configuration
+  - PostgreSQL database integration
+
+#### Added - Frontend (React + TypeScript + SWC)
+- Vite project with React and TypeScript
+- SWC compiler for faster builds (Rust-based)
+- Development server configuration
+
+#### Added - Docker & DevOps
+- Backend Dockerfile (multi-stage: SDK → Runtime)
+- Frontend Dockerfile (multi-stage: Node → NGINX)
+- NGINX reverse proxy with:
+  - API routing (`/api/*` → backend)
+  - Frontend serving (`/` → frontend)
+  - SSL/TLS configuration (ready for production)
+  - Rate limiting and security headers
+- `docker-compose.yml` for local development:
+  - PostgreSQL 16 Alpine
+  - Backend with SDK image and hot reload
+  - Frontend with Vite dev server
+  - NGINX reverse proxy
+  - Test database (tmpfs for speed)
+- `docker-compose.prod.yml` for production deployment:
+  - Optimized builds
+  - SSL/TLS support with certbot
+  - Restart policies
+- `.env` file for local configuration
+
+#### Technical Details
+- Framework: .NET 10 (SDK 10.0.101)
+- Database: PostgreSQL 16
+- ORM: Entity Framework Core 10.0.1
+- Frontend: React 18 + TypeScript + SWC
+- Build Tool: Vite
+- Container Runtime: Docker
+- Reverse Proxy: NGINX Alpine
+
+#### Development Workflow
+- Hot reload enabled for both backend and frontend
+- Volume mounts for instant code changes
+- Database migrations ready to apply
+- Full local development environment with single `docker-compose up` command
 
 ---
 
 ## Notes
 
-- **Current Status**: Pre-release - Setting up development environment
-- **Next Milestone**: v0.0.1 - Complete Docker setup and verify local dev environment
+- **Current Version**: v0.0.1 - Initial setup complete ✅
+- **Next Milestone**: v0.1.0 - GitHub OAuth authentication
 - **Target for MVP**: v1.0.0 - Full authentication, CRUD, backlogs, and production deployment
+- **Last Updated**: 2024-12-30
