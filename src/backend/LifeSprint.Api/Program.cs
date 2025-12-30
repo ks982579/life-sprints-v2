@@ -6,7 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi();
 
 // Database configuration
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -31,7 +30,7 @@ var app = builder.Build();
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // Development-specific middleware can go here
 }
 
 app.UseCors("AllowFrontend");

@@ -299,3 +299,11 @@ cd ./src
 npm create vite@latest frontend
 # Selected React and the TypeScript + SWC option
 ```
+
+Docker
+
+```bash
+docker compose up -d
+docker compose logs -f
+docker compose ps
+```

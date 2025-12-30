@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: lifesprint-postgres-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - lifesprint-network
+
+  # Backend API (.NET)
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    container_name: lifesprint-backend-prod
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=${DATABASE_URL}
+      - GitHub__ClientId=${GITHUB_CLIENT_ID}
+      - GitHub__ClientSecret=${GITHUB_CLIENT_SECRET}
+      - GitHub__CallbackUrl=https://life-sprint.sullivansoftware.dev/api/auth/github/callback
+      - CorsOrigins=https://life-sprint.sullivansoftware.dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "
+        dotnet ef database update --project LifeSprint.Infrastructure.dll &&
+        dotnet LifeSprint.Api.dll
+      "
+    networks:
+      - lifesprint-network
+
+  # Frontend (React + Vite) - production build
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=/api
+    container_name: lifesprint-frontend-prod
+    restart: unless-stopped
+    networks:
+      - lifesprint-network
+
+  # NGINX reverse proxy
+  nginx:
+    build:
+      context: ./src/nginx
+      dockerfile: Dockerfile
+    container_name: lifesprint-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Mount SSL certificates (configure after obtaining from Let's Encrypt)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - lifesprint-network
+
+  # Certbot for SSL certificate management (run manually or via cron)
+  certbot:
+    image: certbot/certbot
+    container_name: lifesprint-certbot
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - lifesprint-network
+
+volumes:
+  postgres_data:
+
+networks:
+  lifesprint-network:
+    driver: bridge

@@ -1,0 +1,103 @@
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: lifesprint-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lifesprint}
+      POSTGRES_USER: ${POSTGRES_USER:-lifesprint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lifesprint}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lifesprint-network
+
+  # Backend API (.NET) - Development with SDK
+  backend:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    container_name: lifesprint-backend
+    working_dir: /src
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=${POSTGRES_DB:-lifesprint};Username=${POSTGRES_USER:-lifesprint};Password=${POSTGRES_PASSWORD:-dev_password}
+      - GitHub__ClientId=${GITHUB_CLIENT_ID}
+      - GitHub__ClientSecret=${GITHUB_CLIENT_SECRET}
+      - GitHub__CallbackUrl=${GITHUB_CALLBACK_URL:-http://localhost/api/auth/github/callback}
+      - CorsOrigins=http://localhost:3000,http://localhost
+      - ASPNETCORE_URLS=http://+:5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src/backend:/src
+      - backend_nuget:/root/.nuget/packages
+    command: >
+      sh -c "
+        cd LifeSprint.Api &&
+        dotnet watch run --no-hot-reload
+      "
+    networks:
+      - lifesprint-network
+
+  # Frontend (React + Vite)
+  frontend:
+    image: node:20-alpine
+    container_name: lifesprint-frontend
+    working_dir: /app
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost/api}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src/frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
+    networks:
+      - lifesprint-network
+
+  # NGINX reverse proxy
+  nginx:
+    build:
+      context: ./src/nginx
+      dockerfile: Dockerfile
+    container_name: lifesprint-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - lifesprint-network
+
+  # Test database (for integration tests)
+  test-db:
+    image: postgres:16-alpine
+    container_name: lifesprint-test-db
+    environment:
+      POSTGRES_DB: lifesprint_test
+      POSTGRES_USER: lifesprint_test
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - lifesprint-network
+
+volumes:
+  postgres_data:
+  backend_nuget:
+  frontend_node_modules:
+
+networks:
+  lifesprint-network:
+    driver: bridge
