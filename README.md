@@ -287,4 +287,15 @@ dotnet add LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj package Np
 dotnet add LifeSprint.Tests/LifeSprint.Tests.csproj package Moq \
 && dotnet add LifeSprint.Tests/LifeSprint.Tests.csproj package FluentAssertions \
 && dotnet add LifeSprint.Tests/LifeSprint.Tests.csproj package Microsoft.EntityFrameworkCore.InMemory
+
+dotnet tool install --global dotnet-ef
+
+dotnet ef migrations add InitialCreate --project LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj --startup-project LifeSprint.Api/LifeSprint.Api.csproj
+   --output-dir Data/Migrations
+```
+
+```bash
+cd ./src
+npm create vite@latest frontend
+# Selected React and the TypeScript + SWC option
 ```
