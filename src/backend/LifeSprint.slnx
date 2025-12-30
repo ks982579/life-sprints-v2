@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="LifeSprint.Api/LifeSprint.Api.csproj" />
+  <Project Path="LifeSprint.Core/LifeSprint.Core.csproj" />
+  <Project Path="LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj" />
+  <Project Path="LifeSprint.Tests/LifeSprint.Tests.csproj" />
+</Solution>
