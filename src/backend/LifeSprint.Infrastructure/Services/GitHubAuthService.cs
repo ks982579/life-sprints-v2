@@ -119,6 +119,38 @@ public class GitHubAuthService : IAuthService
         }
     }
 
+    public async Task<User> CreateOrGetTestUserAsync(string username, string? email = null, string? avatarUrl = null)
+    {
+        // Use a consistent ID format for test users
+        var testUserId = $"test_{username}";
+
+        // Check if user already exists
+        var existingUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == testUserId);
+
+        if (existingUser != null)
+        {
+            return existingUser;
+        }
+
+        // Create new test user
+        var user = new User
+        {
+            Id = testUserId,
+            GitHubUsername = username,
+            Email = email ?? $"{username}@test.local",
+            AvatarUrl = avatarUrl ?? $"https://api.dicebear.com/7.x/avataaars/svg?seed={username}",
+            AccessToken = null, // No real token for test users
+            CreatedAt = DateTime.UtcNow,
+            LastLoginAt = DateTime.UtcNow
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        return user;
+    }
+
     private async Task<string> ExchangeCodeForTokenAsync(string code)
     {
         var clientId = _config["GitHub:ClientId"];

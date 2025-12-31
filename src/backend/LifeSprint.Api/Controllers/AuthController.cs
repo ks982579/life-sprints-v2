@@ -118,6 +118,62 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Test-only login endpoint for E2E testing (Development/Test environments only)
+    /// </summary>
+    [HttpPost("test-login")]
+    public async Task<IActionResult> TestLogin([FromBody] TestLoginDto request)
+    {
+        // Only allow in Development or Test environments
+        var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        if (environment != "Development" && environment != "Test")
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            return BadRequest("Username is required");
+        }
+
+        try
+        {
+            // Create or get test user
+            var user = await _authService.CreateOrGetTestUserAsync(
+                request.Username,
+                request.Email,
+                request.AvatarUrl
+            );
+
+            // Create session
+            var session = await _authService.CreateSessionAsync(user.Id);
+
+            // Set session cookie
+            Response.Cookies.Append(SessionCookieName, session.SessionToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Lax,
+                Expires = session.ExpiresAt
+            });
+
+            _logger.LogInformation("Test user {Username} logged in successfully", user.GitHubUsername);
+
+            return Ok(new CurrentUserDto
+            {
+                Id = user.Id,
+                GitHubUsername = user.GitHubUsername,
+                Email = user.Email,
+                AvatarUrl = user.AvatarUrl
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during test login");
+            return StatusCode(500, "Test login failed");
+        }
+    }
+
+    /// <summary>
     /// Gets the current authenticated user
     /// </summary>
     [HttpGet("me")]

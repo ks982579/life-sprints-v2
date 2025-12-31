@@ -38,4 +38,13 @@ public interface IAuthService
     /// </summary>
     /// <param name="sessionToken">Session token</param>
     Task DeleteSessionAsync(string sessionToken);
+
+    /// <summary>
+    /// Creates or retrieves a test user for development/testing
+    /// </summary>
+    /// <param name="username">Test username</param>
+    /// <param name="email">Optional email</param>
+    /// <param name="avatarUrl">Optional avatar URL</param>
+    /// <returns>User entity</returns>
+    Task<User> CreateOrGetTestUserAsync(string username, string? email = null, string? avatarUrl = null);
 }
