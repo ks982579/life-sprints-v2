@@ -11,6 +11,5 @@ public class User
     public DateTime? LastLoginAt { get; set; }
 
     // Navigation properties
-    public ICollection<Activity> Activities { get; set; } = new List<Activity>();
     public ICollection<Session> Sessions { get; set; } = new List<Session>();
 }

@@ -9,9 +9,14 @@ public class AppDbContext : DbContext
     {
     }
 
-    public DbSet<Activity> Activities => Set<Activity>();
+    // Authentication
     public DbSet<User> Users => Set<User>();
     public DbSet<Session> Sessions => Set<Session>();
+
+    // Activity Management (New Container Architecture)
+    public DbSet<ActivityTemplate> ActivityTemplates => Set<ActivityTemplate>();
+    public DbSet<Container> Containers => Set<Container>();
+    public DbSet<ContainerActivity> ContainerActivities => Set<ContainerActivity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,48 +34,75 @@ public class AppDbContext : DbContext
             entity.Property(u => u.CreatedAt).IsRequired();
 
             // Relationships
-            entity.HasMany(u => u.Activities)
-                .WithOne()
-                .HasForeignKey(a => a.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
             entity.HasMany(u => u.Sessions)
                 .WithOne(s => s.User)
                 .HasForeignKey(s => s.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Activity configuration
-        modelBuilder.Entity<Activity>(entity =>
+        // ActivityTemplate configuration
+        modelBuilder.Entity<ActivityTemplate>(entity =>
         {
-            entity.HasKey(a => a.Id);
-            entity.Property(a => a.UserId).IsRequired().HasMaxLength(255);
-            entity.Property(a => a.Title).IsRequired().HasMaxLength(500);
-            entity.Property(a => a.Description).HasColumnType("text");
-            entity.Property(a => a.Type).IsRequired()
-                .HasConversion<string>()
-                .HasMaxLength(50);
-            entity.Property(a => a.State).IsRequired()
-                .HasConversion<string>()
-                .HasMaxLength(50);
-            entity.Property(a => a.EstimatedHours).HasColumnType("decimal(10,2)");
-            entity.Property(a => a.ActualHours).HasColumnType("decimal(10,2)");
-            entity.Property(a => a.CreatedAt).IsRequired();
-            entity.Property(a => a.UpdatedAt).IsRequired();
+            entity.HasKey(at => at.Id);
+            entity.Property(at => at.UserId).IsRequired().HasMaxLength(255);
+            entity.Property(at => at.Title).IsRequired().HasMaxLength(500);
+            entity.Property(at => at.Description).HasColumnType("text");
+            entity.Property(at => at.IsRecurring).IsRequired();
+            entity.Property(at => at.RecurrenceType).IsRequired()
+                .HasConversion<string>();
+            entity.Property(at => at.CreatedAt).IsRequired();
 
-            // Indexes
-            entity.HasIndex(a => a.UserId);
-            entity.HasIndex(a => a.Type);
-            entity.HasIndex(a => a.State);
-            entity.HasIndex(a => a.ParentId);
-            entity.HasIndex(a => new { a.InAnnualBacklog, a.InMonthlyBacklog, a.InWeeklySprint, a.InDailyChecklist })
-                .HasDatabaseName("IX_Activity_BacklogFlags");
+            // Indexes for common queries
+            entity.HasIndex(at => at.UserId);
+            entity.HasIndex(at => new { at.UserId, at.IsRecurring });
+            entity.HasIndex(at => at.ArchivedAt); // For filtering out archived templates
+        });
 
-            // Self-referencing relationship for hierarchy
-            entity.HasOne(a => a.Parent)
-                .WithMany(a => a.Children)
-                .HasForeignKey(a => a.ParentId)
-                .OnDelete(DeleteBehavior.Restrict);
+        // Container configuration
+        modelBuilder.Entity<Container>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.UserId).IsRequired().HasMaxLength(255);
+            entity.Property(c => c.Type).IsRequired()
+                .HasConversion<string>();
+            entity.Property(c => c.Status).IsRequired()
+                .HasConversion<string>();
+            entity.Property(c => c.StartDate).IsRequired();
+            entity.Property(c => c.Comments).HasMaxLength(1000);
+            entity.Property(c => c.CreatedAt).IsRequired();
+
+            // Indexes for querying containers by type, status, and date range
+            entity.HasIndex(c => c.UserId);
+            entity.HasIndex(c => new { c.UserId, c.Type, c.Status });
+            entity.HasIndex(c => new { c.UserId, c.StartDate, c.EndDate });
+        });
+
+        // ContainerActivity configuration (JUNCTION TABLE)
+        modelBuilder.Entity<ContainerActivity>(entity =>
+        {
+            // Composite primary key (ContainerId + ActivityTemplateId)
+            entity.HasKey(ca => new { ca.ContainerId, ca.ActivityTemplateId });
+
+            entity.Property(ca => ca.AddedAt).IsRequired();
+            entity.Property(ca => ca.Order).IsRequired();
+            entity.Property(ca => ca.IsRolledOver).IsRequired();
+
+            // Relationships - many-to-many via junction table
+            entity.HasOne(ca => ca.Container)
+                .WithMany(c => c.ContainerActivities)
+                .HasForeignKey(ca => ca.ContainerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(ca => ca.ActivityTemplate)
+                .WithMany(at => at.ContainerActivities)
+                .HasForeignKey(ca => ca.ActivityTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes for common queries
+            entity.HasIndex(ca => ca.ContainerId);
+            entity.HasIndex(ca => ca.ActivityTemplateId);
+            entity.HasIndex(ca => new { ca.ContainerId, ca.Order }); // For ordered lists
+            entity.HasIndex(ca => ca.CompletedAt); // For filtering completed/incomplete
         });
 
         // Session configuration
@@ -102,40 +134,51 @@ public class AppDbContext : DbContext
 
     private void UpdateTimestamps()
     {
-        var entries = ChangeTracker.Entries()
-            .Where(e => e.Entity is Activity && (e.State == EntityState.Added || e.State == EntityState.Modified));
+        var now = DateTime.UtcNow;
 
-        foreach (var entry in entries)
-        {
-            var activity = (Activity)entry.Entity;
-
-            if (entry.State == EntityState.Added)
-            {
-                activity.CreatedAt = DateTime.UtcNow;
-                activity.UpdatedAt = DateTime.UtcNow;
-            }
-            else if (entry.State == EntityState.Modified)
-            {
-                activity.UpdatedAt = DateTime.UtcNow;
-            }
-        }
-
-        var userEntries = ChangeTracker.Entries()
-            .Where(e => e.Entity is User && e.State == EntityState.Added);
+        // Handle User timestamps
+        var userEntries = ChangeTracker.Entries<User>()
+            .Where(e => e.State == EntityState.Added);
 
         foreach (var entry in userEntries)
         {
-            var user = (User)entry.Entity;
-            user.CreatedAt = DateTime.UtcNow;
+            entry.Entity.CreatedAt = now;
         }
 
-        var sessionEntries = ChangeTracker.Entries()
-            .Where(e => e.Entity is Session && e.State == EntityState.Added);
+        // Handle Session timestamps
+        var sessionEntries = ChangeTracker.Entries<Session>()
+            .Where(e => e.State == EntityState.Added);
 
         foreach (var entry in sessionEntries)
         {
-            var session = (Session)entry.Entity;
-            session.CreatedAt = DateTime.UtcNow;
+            entry.Entity.CreatedAt = now;
+        }
+
+        // Handle ActivityTemplate timestamps
+        var templateEntries = ChangeTracker.Entries<ActivityTemplate>()
+            .Where(e => e.State == EntityState.Added);
+
+        foreach (var entry in templateEntries)
+        {
+            entry.Entity.CreatedAt = now;
+        }
+
+        // Handle Container timestamps
+        var containerEntries = ChangeTracker.Entries<Container>()
+            .Where(e => e.State == EntityState.Added);
+
+        foreach (var entry in containerEntries)
+        {
+            entry.Entity.CreatedAt = now;
+        }
+
+        // Handle ContainerActivity timestamps
+        var containerActivityEntries = ChangeTracker.Entries<ContainerActivity>()
+            .Where(e => e.State == EntityState.Added);
+
+        foreach (var entry in containerActivityEntries)
+        {
+            entry.Entity.AddedAt = now;
         }
     }
 }
