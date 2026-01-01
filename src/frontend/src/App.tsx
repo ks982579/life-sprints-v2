@@ -1,35 +1,62 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+function Dashboard() {
+  const { user, logout } = useAuth();
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="dashboard">
+      <header className="dashboard-header">
+        <h1>Life Sprint</h1>
+        <div className="user-info">
+          {user?.avatarUrl && (
+            <img
+              src={user.avatarUrl}
+              alt={user.gitHubUsername}
+              className="avatar"
+            />
+          )}
+          <span>Welcome, {user?.gitHubUsername}!</span>
+          <button onClick={logout} className="logout-button">
+            Logout
+          </button>
+        </div>
+      </header>
+
+      <main className="dashboard-content">
+        <h2>Your Backlogs</h2>
+        <div className="backlog-grid">
+          <div className="backlog-card">
+            <h3>Annual Backlog</h3>
+            <p>Long-term goals and projects</p>
+          </div>
+          <div className="backlog-card">
+            <h3>Monthly Backlog</h3>
+            <p>This month's objectives</p>
+          </div>
+          <div className="backlog-card">
+            <h3>Weekly Sprint</h3>
+            <p>Current week's focus</p>
+          </div>
+          <div className="backlog-card">
+            <h3>Daily Checklist</h3>
+            <p>Today's tasks</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 }
 
-export default App
+function App() {
+  return (
+    <AuthProvider>
+      <ProtectedRoute>
+        <Dashboard />
+      </ProtectedRoute>
+    </AuthProvider>
+  );
+}
+
+export default App;

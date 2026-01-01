@@ -7,10 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Next Up - Phase 2: Authentication
-- GitHub OAuth integration
-- Backend authentication services and controllers
-- Frontend auth context and protected routes
+### Next Up - Phase 3: Core Activity CRUD
+- Backend Activity CRUD API
+- Frontend Activity components and management
+- Activity state management and backlog filtering
 
 ---
 
@@ -25,14 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [x] Test full Docker environment
 - [x] **Tag: v0.0.1 - Initial Setup Complete**
 
-### Phase 2: Authentication (Week 2)
-- [ ] GitHub OAuth integration
-  - [ ] Backend: GitHubAuthService
-  - [ ] Backend: AuthController with OAuth endpoints
-  - [ ] Backend: Session middleware
-  - [ ] Frontend: AuthContext and useAuth hook
-  - [ ] Frontend: Login page and ProtectedRoute component
-- [ ] E2E auth testing with Playwright
+### Phase 2: Authentication ✅ COMPLETED
+- [x] GitHub OAuth integration
+  - [x] Backend: GitHubAuthService
+  - [x] Backend: AuthController with OAuth endpoints
+  - [x] Backend: Session middleware
+  - [x] Frontend: AuthContext and useAuth hook
+  - [x] Frontend: Login page and ProtectedRoute component
+- [x] E2E auth testing with Playwright
+- [x] Test-only auth endpoint for E2E testing
+- [x] **Tag: v0.1.0 - Authentication Complete**
 
 ### Phase 3: Core Activity CRUD (Week 2)
 - [ ] Backend API:
@@ -113,7 +115,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-### [0.0.1] - 2024-12-30 - Initial Setup Complete
+### [0.1.0] - 2025-12-31 - Authentication Complete
+
+#### Added - Backend Authentication
+- GitHub OAuth integration:
+  - `IAuthService` interface defining authentication contract
+  - `GitHubAuthService` with full OAuth flow implementation
+  - Token exchange with GitHub API
+  - User creation and retrieval from GitHub data
+- `AuthController` with OAuth endpoints:
+  - `GET /api/auth/github/login` - Initiates GitHub OAuth flow with CSRF protection
+  - `GET /api/auth/github/callback` - Handles OAuth callback and creates session
+  - `POST /api/auth/logout` - Clears user session
+  - `GET /api/auth/me` - Returns current authenticated user
+  - `POST /api/auth/test-login` - Test-only endpoint for E2E testing (Development/Test only)
+- Session-based authentication:
+  - HTTP-only secure cookies
+  - 30-day session expiration
+  - CSRF token validation with state parameter
+  - Cookie policy configuration (SameSite.Lax, Secure)
+- DTOs for auth operations:
+  - `CurrentUserDto` - User information response
+  - `GitHubTokenResponse` - GitHub token exchange response
+  - `GitHubUserResponse` - GitHub user API response
+  - `TestLoginDto` - Test login request
+- Unit tests for `GitHubAuthService`:
+  - Test-driven development (TDD) approach
+  - URL encoding validation
+  - Session creation and expiration
+  - InMemory database for testing
+- NuGet packages added:
+  - Microsoft.Extensions.Http 10.0.0 (HttpClient factory)
+
+#### Added - Frontend Authentication
+- Authentication context and hooks:
+  - `AuthContext` with user state management
+  - `useAuth()` hook for consuming auth state
+  - Automatic user loading on application mount
+  - Login/logout functions
+- Components:
+  - `LoginPage` - Beautiful gradient login UI with GitHub button
+  - `ProtectedRoute` - Route guard component for authenticated pages
+  - `Dashboard` - Protected dashboard with user info and backlog cards
+- Services:
+  - `api.ts` - Generic fetch wrapper with credentials support
+  - `authService.ts` - Auth API client (login, logout, getCurrentUser)
+- Type definitions:
+  - `User` interface matching backend DTOs
+  - `AuthContextType` for context typing
+- Styling:
+  - Responsive login page with gradient background
+  - GitHub icon SVG
+  - User avatar display
+  - Professional card-based layout
+
+#### Added - E2E Testing Infrastructure
+- Playwright setup:
+  - playwright.config.ts with Chromium browser
+  - Test directory structure (`e2e/`)
+  - HTML reporter configuration
+  - CI-aware webServer configuration
+- E2E test suite (`e2e/auth.spec.ts`):
+  - ✅ Full login flow with test user and dashboard access
+  - ✅ Login page displays correctly when not authenticated
+  - ✅ API returns user data when authenticated with cookie sharing
+  - ✅ API returns 401 when not authenticated
+- Test scripts in package.json:
+  - `npm run test:e2e` - Run tests headless
+  - `npm run test:e2e:ui` - Run tests with Playwright UI
+  - `npm run test:e2e:headed` - Run tests in headed browser
+- Test auth endpoint implementation:
+  - Creates test users with `test_` prefix
+  - Auto-generates avatars using DiceBear API
+  - Bypasses real GitHub OAuth for reliable testing
+  - Only available in Development/Test environments
+
+#### Fixed - Docker Configuration
+- Backend startup race condition:
+  - Added retry logic for database connection
+  - Automatic migration application on startup
+  - dotnet-ef tool installation in SDK container
+- Backend port configuration:
+  - Updated launchSettings.json to listen on 0.0.0.0:5000
+  - Fixed NGINX proxy connection issues
+- NGINX configuration:
+  - Updated frontend upstream to port 3000 (Vite dev server)
+  - Rebuild process for configuration changes
+
+#### Technical Details
+- Authentication: GitHub OAuth 2.0 with cookie-based sessions
+- Session Storage: PostgreSQL database
+- Frontend State Management: React Context API
+- E2E Testing: Playwright with Chromium
+- Test Users: Isolated with `test_` ID prefix
+- CSRF Protection: State token validation
+- Cookie Security: HTTP-only, Secure, SameSite=Lax
+
+#### Development Workflow Improvements
+- Test-driven development for authentication services
+- Playwright E2E tests run against live Docker containers
+- Test auth endpoint enables reliable E2E testing without external dependencies
+- Hot reload maintained for both frontend and backend
+
+---
+
+### [0.0.1] - 2025-12-30 - Initial Setup Complete
 
 #### Added - Infrastructure
 - Project monorepo structure with `src/backend`, `src/frontend`, `src/nginx`
@@ -193,7 +299,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Notes
 
-- **Current Version**: v0.0.1 - Initial setup complete ✅
-- **Next Milestone**: v0.1.0 - GitHub OAuth authentication
-- **Target for MVP**: v1.0.0 - Full authentication, CRUD, backlogs, and production deployment
-- **Last Updated**: 2024-12-30
+- **Current Version**: v0.1.0 - Authentication complete ✅
+- **Next Milestone**: v0.2.0 - Core Activity CRUD and Backlog Views
+- **Target for MVP**: v1.0.0 - Full CRUD, backlogs, testing, and production deployment
+- **Last Updated**: 2025-12-31
