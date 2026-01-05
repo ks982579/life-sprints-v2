@@ -20,6 +20,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Authentication services
 builder.Services.AddScoped<IAuthService, GitHubAuthService>();
 
+// Activity management services
+builder.Services.AddScoped<IContainerService, ContainerService>();
+builder.Services.AddScoped<IActivityService, ActivityService>();
+
 // Cookie policy for authentication
 builder.Services.Configure<CookiePolicyOptions>(options =>
 {
