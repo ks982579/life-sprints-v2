@@ -47,14 +47,24 @@ public class AppDbContext : DbContext
             entity.Property(at => at.UserId).IsRequired().HasMaxLength(255);
             entity.Property(at => at.Title).IsRequired().HasMaxLength(500);
             entity.Property(at => at.Description).HasColumnType("text");
+            entity.Property(at => at.Type).IsRequired()
+                .HasConversion<string>();
             entity.Property(at => at.IsRecurring).IsRequired();
             entity.Property(at => at.RecurrenceType).IsRequired()
                 .HasConversion<string>();
             entity.Property(at => at.CreatedAt).IsRequired();
 
+            // Self-referencing relationship for parent-child hierarchy
+            entity.HasOne(at => at.ParentActivity)
+                .WithMany(at => at.ChildActivities)
+                .HasForeignKey(at => at.ParentActivityId)
+                .OnDelete(DeleteBehavior.Restrict); // Prevent cascade delete
+
             // Indexes for common queries
             entity.HasIndex(at => at.UserId);
+            entity.HasIndex(at => new { at.UserId, at.Type });
             entity.HasIndex(at => new { at.UserId, at.IsRecurring });
+            entity.HasIndex(at => at.ParentActivityId); // For hierarchy queries
             entity.HasIndex(at => at.ArchivedAt); // For filtering out archived templates
         });
 

@@ -1,0 +1,36 @@
+.backlog-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 1.5rem;
+}
+
+.tab-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s ease;
+  position: relative;
+  bottom: -2px;
+}
+
+.tab-button:hover {
+  color: #333;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.tab-button.active {
+  color: #0066cc;
+  border-bottom-color: #0066cc;
+  font-weight: 600;
+}
+
+.tab-button:focus {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+}

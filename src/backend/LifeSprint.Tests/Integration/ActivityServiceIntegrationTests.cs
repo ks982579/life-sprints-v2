@@ -28,7 +28,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
 
         var dto = new CreateActivityDto
         {
-            Title = "Build a REST API",
+            Title = "Build a REST API", Type = ActivityType.Task,
             Description = "Create activity endpoints with proper CRUD operations",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None
@@ -70,7 +70,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
 
         var dto = new CreateActivityDto
         {
-            Title = "Annual planning session",
+            Title = "Annual planning session", Type = ActivityType.Task,
             Description = "Set goals for the year",
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Annual,
@@ -109,7 +109,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
 
         var dto = new CreateActivityDto
         {
-            Title = "Monthly review",
+            Title = "Monthly review", Type = ActivityType.Task,
             Description = "Review progress and adjust goals",
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Monthly,
@@ -141,7 +141,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
 
         var dto = new CreateActivityDto
         {
-            Title = "Weekly sprint planning",
+            Title = "Weekly sprint planning", Type = ActivityType.Task,
             Description = "Plan the week's tasks",
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Weekly,
@@ -171,11 +171,11 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
         // Create activities for test user
         await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
         {
-            Title = "My Activity 1"
+            Title = "My Activity 1", Type = ActivityType.Task
         });
         await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
         {
-            Title = "My Activity 2"
+            Title = "My Activity 2", Type = ActivityType.Task
         });
 
         // Create activity for different user
@@ -203,7 +203,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
 
         var created = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
         {
-            Title = "Test Activity",
+            Title = "Test Activity", Type = ActivityType.Task,
             Description = "Detailed description",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None
@@ -231,15 +231,15 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
         // Act - Create three activities
         var activity1 = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
         {
-            Title = "First Activity"
+            Title = "First Activity", Type = ActivityType.Task
         });
         var activity2 = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
         {
-            Title = "Second Activity"
+            Title = "Second Activity", Type = ActivityType.Task
         });
         var activity3 = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
         {
-            Title = "Third Activity"
+            Title = "Third Activity", Type = ActivityType.Task
         });
 
         // Assert - Check ordering in container
@@ -269,7 +269,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
 
         var dto = new CreateActivityDto
         {
-            Title = "Daily standup",
+            Title = "Daily standup", Type = ActivityType.Task,
             Description = "Team sync meeting",
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Daily

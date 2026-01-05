@@ -45,8 +45,16 @@ services:
         echo 'Installing dotnet-ef tool...' &&
         dotnet tool install --global dotnet-ef --version 10.* 2>/dev/null || echo 'dotnet-ef already installed' &&
         export PATH=\"$PATH:/root/.dotnet/tools\" &&
-        echo 'Waiting for database to be ready...' &&
-        until dotnet ef database update --project LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj --startup-project LifeSprint.Api/LifeSprint.Api.csproj 2>/dev/null; do
+        echo 'Restoring NuGet packages...' &&
+        dotnet restore LifeSprint.Api/LifeSprint.Api.csproj &&
+        echo 'Building projects...' &&
+        dotnet build LifeSprint.Api/LifeSprint.Api.csproj --no-restore &&
+        echo 'Waiting for database to be ready and applying migrations...' &&
+        until dotnet ef database update --project LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj --startup-project LifeSprint.Api/LifeSprint.Api.csproj --no-build 2>&1 | tee /tmp/ef-output.log; do
+          if grep -q 'Unable to retrieve project metadata' /tmp/ef-output.log; then
+            echo 'Project metadata error - check project files' &&
+            exit 1
+          fi &&
           echo 'Database not ready yet, retrying in 2 seconds...' &&
           sleep 2
         done &&

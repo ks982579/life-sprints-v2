@@ -1,9 +1,56 @@
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { BacklogTabs, ActivityList, ActivityEditor } from './components/Activities';
+import { activityService } from './services/activityService';
+import { ContainerType, ActivityType, RecurrenceType, type Activity } from './types';
 import './App.css';
 
 function Dashboard() {
   const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<ContainerType>(ContainerType.Annual);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
+
+  // Load activities on mount
+  useEffect(() => {
+    loadActivities();
+  }, []);
+
+  const loadActivities = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await activityService.getActivities();
+      setActivities(data);
+    } catch (err) {
+      setError('Failed to load activities. Please try again.');
+      console.error('Error loading activities:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateActivity = async (activityData: {
+    title: string;
+    description?: string;
+    type: ActivityType;
+    parentActivityId?: number;
+    isRecurring: boolean;
+    recurrenceType: RecurrenceType;
+  }) => {
+    try {
+      setError(null);
+      await activityService.createActivity(activityData);
+      await loadActivities();
+      setShowEditor(false);
+    } catch (err) {
+      setError('Failed to create activity. Please try again.');
+      console.error('Error creating activity:', err);
+    }
+  };
 
   return (
     <div className="dashboard">
@@ -25,25 +72,43 @@ function Dashboard() {
       </header>
 
       <main className="dashboard-content">
-        <h2>Your Backlogs</h2>
-        <div className="backlog-grid">
-          <div className="backlog-card">
-            <h3>Annual Backlog</h3>
-            <p>Long-term goals and projects</p>
-          </div>
-          <div className="backlog-card">
-            <h3>Monthly Backlog</h3>
-            <p>This month's objectives</p>
-          </div>
-          <div className="backlog-card">
-            <h3>Weekly Sprint</h3>
-            <p>Current week's focus</p>
-          </div>
-          <div className="backlog-card">
-            <h3>Daily Checklist</h3>
-            <p>Today's tasks</p>
-          </div>
+        <div className="content-header">
+          <h2>Your Backlogs</h2>
+          <button
+            onClick={() => setShowEditor(!showEditor)}
+            className="create-button"
+          >
+            {showEditor ? 'Cancel' : 'Create New Item'}
+          </button>
         </div>
+
+        {error && (
+          <div className="error-message">
+            {error}
+            <button onClick={() => setError(null)} className="dismiss-button">
+              ×
+            </button>
+          </div>
+        )}
+
+        <BacklogTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {showEditor && (
+          <ActivityEditor
+            activities={activities}
+            onSave={handleCreateActivity}
+            onCancel={() => setShowEditor(false)}
+          />
+        )}
+
+        {loading ? (
+          <div className="loading">Loading activities...</div>
+        ) : (
+          <ActivityList
+            activities={activities}
+            containerType={activeTab}
+          />
+        )}
       </main>
     </div>
   );

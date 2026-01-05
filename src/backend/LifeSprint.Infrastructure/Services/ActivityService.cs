@@ -34,12 +34,29 @@ public class ActivityService : IActivityService
     /// </summary>
     public async Task<ActivityResponseDto> CreateActivityAsync(string userId, CreateActivityDto dto)
     {
+        // Validate parent relationship if specified
+        if (dto.ParentActivityId.HasValue)
+        {
+            var parent = await _context.ActivityTemplates
+                .FirstOrDefaultAsync(at => at.Id == dto.ParentActivityId.Value && at.UserId == userId);
+
+            if (parent == null)
+            {
+                throw new InvalidOperationException($"Parent activity {dto.ParentActivityId} not found or unauthorized");
+            }
+
+            // Validate hierarchy rules (optional but recommended)
+            ValidateHierarchy(dto.Type, parent.Type);
+        }
+
         // Create the activity template
         var activityTemplate = new ActivityTemplate
         {
             UserId = userId,
             Title = dto.Title,
             Description = dto.Description,
+            Type = dto.Type,
+            ParentActivityId = dto.ParentActivityId,
             IsRecurring = dto.IsRecurring,
             RecurrenceType = dto.RecurrenceType,
             CreatedAt = DateTime.UtcNow
@@ -91,6 +108,8 @@ public class ActivityService : IActivityService
     {
         var activities = await _context.ActivityTemplates
             .Where(at => at.UserId == userId && at.ArchivedAt == null)
+            .Include(at => at.ParentActivity)
+            .Include(at => at.ChildActivities)
             .Include(at => at.ContainerActivities)
                 .ThenInclude(ca => ca.Container)
             .OrderByDescending(at => at.CreatedAt)
@@ -106,6 +125,8 @@ public class ActivityService : IActivityService
     {
         var activity = await _context.ActivityTemplates
             .Where(at => at.Id == activityId && at.UserId == userId)
+            .Include(at => at.ParentActivity)
+            .Include(at => at.ChildActivities)
             .Include(at => at.ContainerActivities)
                 .ThenInclude(ca => ca.Container)
             .FirstOrDefaultAsync();
@@ -126,6 +147,30 @@ public class ActivityService : IActivityService
     }
 
     /// <summary>
+    /// Validates that the parent-child relationship follows proper hierarchy rules.
+    /// </summary>
+    private static void ValidateHierarchy(ActivityType childType, ActivityType parentType)
+    {
+        // Define valid parent-child relationships
+        var validRelationships = new Dictionary<ActivityType, List<ActivityType>>
+        {
+            { ActivityType.Epic, new List<ActivityType> { ActivityType.Project } },
+            { ActivityType.Story, new List<ActivityType> { ActivityType.Epic, ActivityType.Project } },
+            { ActivityType.Task, new List<ActivityType> { ActivityType.Story, ActivityType.Epic } }
+        };
+
+        if (validRelationships.ContainsKey(childType))
+        {
+            if (!validRelationships[childType].Contains(parentType))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid hierarchy: {childType} cannot be a child of {parentType}. " +
+                    $"Valid parents for {childType}: {string.Join(", ", validRelationships[childType])}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Maps an ActivityTemplate entity to ActivityResponseDto.
     /// </summary>
     private static ActivityResponseDto MapToDto(ActivityTemplate activity)
@@ -136,6 +181,9 @@ public class ActivityService : IActivityService
             UserId = activity.UserId,
             Title = activity.Title,
             Description = activity.Description,
+            Type = activity.Type,
+            ParentActivityId = activity.ParentActivityId,
+            ParentActivityTitle = activity.ParentActivity?.Title,
             IsRecurring = activity.IsRecurring,
             RecurrenceType = activity.RecurrenceType,
             CreatedAt = activity.CreatedAt,
@@ -148,6 +196,12 @@ public class ActivityService : IActivityService
                 CompletedAt = ca.CompletedAt,
                 Order = ca.Order,
                 IsRolledOver = ca.IsRolledOver
+            }).ToList(),
+            Children = activity.ChildActivities.Select(child => new ActivityChildDto
+            {
+                Id = child.Id,
+                Title = child.Title,
+                Type = child.Type
             }).ToList()
         };
     }

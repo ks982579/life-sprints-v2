@@ -48,7 +48,7 @@ public class ActivitiesControllerIntegrationTests : IntegrationTestBase
         var controller = CreateController();
         var dto = new CreateActivityDto
         {
-            Title = "Learn integration testing",
+            Title = "Learn integration testing", Type = ActivityType.Task,
             Description = "Master the art of testing with real databases",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None
@@ -78,7 +78,7 @@ public class ActivitiesControllerIntegrationTests : IntegrationTestBase
         var controller = CreateController();
         var dto = new CreateActivityDto
         {
-            Title = "Weekly retrospective",
+            Title = "Weekly retrospective", Type = ActivityType.Task,
             Description = "Team reflection and improvement planning",
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Weekly
@@ -107,7 +107,7 @@ public class ActivitiesControllerIntegrationTests : IntegrationTestBase
 
         var dto = new CreateActivityDto
         {
-            Title = "Monthly budget review",
+            Title = "Monthly budget review", Type = ActivityType.Task,
             ContainerId = monthlyContainer.Id
         };
 
@@ -130,9 +130,9 @@ public class ActivitiesControllerIntegrationTests : IntegrationTestBase
         var controller = CreateController();
 
         // Create some activities first
-        await controller.CreateActivity(new CreateActivityDto { Title = "Activity 1" });
-        await controller.CreateActivity(new CreateActivityDto { Title = "Activity 2" });
-        await controller.CreateActivity(new CreateActivityDto { Title = "Activity 3" });
+        await controller.CreateActivity(new CreateActivityDto { Title = "Activity 1", Type = ActivityType.Task });
+        await controller.CreateActivity(new CreateActivityDto { Title = "Activity 2", Type = ActivityType.Task });
+        await controller.CreateActivity(new CreateActivityDto { Title = "Activity 3", Type = ActivityType.Task });
 
         // Act
         var result = await controller.GetActivities();
@@ -157,7 +157,7 @@ public class ActivitiesControllerIntegrationTests : IntegrationTestBase
         // Create an activity
         var createResult = await controller.CreateActivity(new CreateActivityDto
         {
-            Title = "Find me",
+            Title = "Find me", Type = ActivityType.Task,
             Description = "I should be retrievable"
         });
 
@@ -198,21 +198,21 @@ public class ActivitiesControllerIntegrationTests : IntegrationTestBase
         // Act - Create multiple activities
         var activity1 = await controller.CreateActivity(new CreateActivityDto
         {
-            Title = "Design database schema",
+            Title = "Design database schema", Type = ActivityType.Task,
             Description = "Plan the data model",
             IsRecurring = false
         });
 
         var activity2 = await controller.CreateActivity(new CreateActivityDto
         {
-            Title = "Implement API endpoints",
+            Title = "Implement API endpoints", Type = ActivityType.Task,
             Description = "Build RESTful services",
             IsRecurring = false
         });
 
         var activity3 = await controller.CreateActivity(new CreateActivityDto
         {
-            Title = "Write tests",
+            Title = "Write tests", Type = ActivityType.Task,
             Description = "Ensure code quality",
             IsRecurring = false
         });
@@ -265,19 +265,19 @@ public class ActivitiesControllerIntegrationTests : IntegrationTestBase
         // Act - Create activities in different containers
         await controller.CreateActivity(new CreateActivityDto
         {
-            Title = "Annual goal",
+            Title = "Annual goal", Type = ActivityType.Task,
             ContainerId = annualContainer.Id
         });
 
         await controller.CreateActivity(new CreateActivityDto
         {
-            Title = "Monthly objective",
+            Title = "Monthly objective", Type = ActivityType.Task,
             ContainerId = monthlyContainer.Id
         });
 
         await controller.CreateActivity(new CreateActivityDto
         {
-            Title = "Weekly task",
+            Title = "Weekly task", Type = ActivityType.Task,
             ContainerId = weeklyContainer.Id
         });
 

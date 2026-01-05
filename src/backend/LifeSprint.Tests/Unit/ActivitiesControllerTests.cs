@@ -53,7 +53,7 @@ public class ActivitiesControllerTests
         // Arrange
         var createDto = new CreateActivityDto
         {
-            Title = "Learn ASP.NET Core",
+            Title = "Learn ASP.NET Core", Type = ActivityType.Task,
             Description = "Build REST APIs",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None
@@ -63,7 +63,7 @@ public class ActivitiesControllerTests
         {
             Id = 1,
             UserId = TestUserId,
-            Title = "Learn ASP.NET Core",
+            Title = "Learn ASP.NET Core", Type = ActivityType.Task,
             Description = "Build REST APIs",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
@@ -113,7 +113,7 @@ public class ActivitiesControllerTests
         // Arrange
         var createDto = new CreateActivityDto
         {
-            Title = "", // Invalid - empty title
+            Title = "", Type = ActivityType.Task, // Invalid - empty title
             Description = "Test"
         };
 
@@ -136,7 +136,7 @@ public class ActivitiesControllerTests
         // Arrange
         var createDto = new CreateActivityDto
         {
-            Title = "Test Activity",
+            Title = "Test Activity", Type = ActivityType.Task,
             ContainerId = 999 // Invalid container
         };
 
@@ -159,7 +159,7 @@ public class ActivitiesControllerTests
         // Arrange
         var createDto = new CreateActivityDto
         {
-            Title = "Test Activity"
+            Title = "Test Activity", Type = ActivityType.Task
         };
 
         _mockActivityService
@@ -181,7 +181,7 @@ public class ActivitiesControllerTests
         // Arrange
         var createDto = new CreateActivityDto
         {
-            Title = "Weekly Review",
+            Title = "Weekly Review", Type = ActivityType.Task,
             Description = "Review progress and plan ahead",
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Weekly
@@ -191,7 +191,7 @@ public class ActivitiesControllerTests
         {
             Id = 2,
             UserId = TestUserId,
-            Title = "Weekly Review",
+            Title = "Weekly Review", Type = ActivityType.Task,
             Description = "Review progress and plan ahead",
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Weekly,
@@ -227,7 +227,7 @@ public class ActivitiesControllerTests
             {
                 Id = 1,
                 UserId = TestUserId,
-                Title = "Activity 1",
+                Title = "Activity 1", Type = ActivityType.Task,
                 IsRecurring = false,
                 RecurrenceType = RecurrenceType.None,
                 CreatedAt = DateTime.UtcNow,
@@ -237,7 +237,7 @@ public class ActivitiesControllerTests
             {
                 Id = 2,
                 UserId = TestUserId,
-                Title = "Activity 2",
+                Title = "Activity 2", Type = ActivityType.Task,
                 IsRecurring = true,
                 RecurrenceType = RecurrenceType.Weekly,
                 CreatedAt = DateTime.UtcNow,
@@ -310,7 +310,7 @@ public class ActivitiesControllerTests
         {
             Id = 1,
             UserId = TestUserId,
-            Title = "Test Activity",
+            Title = "Test Activity", Type = ActivityType.Task,
             Description = "Test Description",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,

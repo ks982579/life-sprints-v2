@@ -18,12 +18,18 @@ public class ActivityTemplate
     public required string Title { get; set; }
     public string? Description { get; set; }
 
+    // Activity type and hierarchy
+    public required ActivityType Type { get; set; } // Project, Epic, Story, or Task
+    public int? ParentActivityId { get; set; } // For hierarchy: Story -> Epic -> Project
+
     public bool IsRecurring { get; set; } // Can this template be automatically added to new containers?
     public RecurrenceType RecurrenceType { get; set; } // How often does it recur?
 
     public DateTime CreatedAt { get; set; }
     public DateTime? ArchivedAt { get; set; } // Soft delete for historical tracking
 
-    // Navigation property - containers this template appears in
+    // Navigation properties
+    public ActivityTemplate? ParentActivity { get; set; } // Parent in hierarchy
+    public ICollection<ActivityTemplate> ChildActivities { get; set; } = new List<ActivityTemplate>(); // Children in hierarchy
     public ICollection<ContainerActivity> ContainerActivities { get; set; } = new List<ContainerActivity>();
 }

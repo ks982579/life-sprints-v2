@@ -57,39 +57,70 @@
   padding: 2rem;
 }
 
-.dashboard-content h2 {
-  color: #333;
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1.5rem;
 }
 
-.backlog-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-}
-
-.backlog-card {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
-  cursor: pointer;
-}
-
-.backlog-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.backlog-card h3 {
-  margin: 0 0 0.5rem 0;
-  color: #667eea;
-  font-size: 1.25rem;
-}
-
-.backlog-card p {
+.content-header h2 {
+  color: #333;
   margin: 0;
+}
+
+.create-button {
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.create-button:hover {
+  background-color: #0052a3;
+}
+
+.create-button:focus {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+}
+
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 1rem 1.5rem;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #fcc;
+}
+
+.dismiss-button {
+  background: none;
+  border: none;
+  color: #c33;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+}
+
+.dismiss-button:hover {
+  color: #a00;
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
   color: #666;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
 }

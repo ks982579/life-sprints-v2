@@ -32,6 +32,21 @@ public record ActivityResponseDto
     public string? Description { get; init; }
 
     /// <summary>
+    /// Type of activity (Project, Epic, Story, Task).
+    /// </summary>
+    public ActivityType Type { get; init; }
+
+    /// <summary>
+    /// Parent activity ID (if this activity is part of a hierarchy).
+    /// </summary>
+    public int? ParentActivityId { get; init; }
+
+    /// <summary>
+    /// Parent activity title (for display purposes).
+    /// </summary>
+    public string? ParentActivityTitle { get; init; }
+
+    /// <summary>
     /// Is this a recurring activity?
     /// </summary>
     public bool IsRecurring { get; init; }
@@ -55,6 +70,21 @@ public record ActivityResponseDto
     /// Containers this activity appears in (with completion status per container).
     /// </summary>
     public List<ContainerAssociationDto> Containers { get; init; } = new();
+
+    /// <summary>
+    /// Child activities (for hierarchical display).
+    /// </summary>
+    public List<ActivityChildDto> Children { get; init; } = new();
+}
+
+/// <summary>
+/// Lightweight DTO for child activities in the hierarchy.
+/// </summary>
+public record ActivityChildDto
+{
+    public int Id { get; init; }
+    public string Title { get; init; } = string.Empty;
+    public ActivityType Type { get; init; }
 }
 
 /// <summary>

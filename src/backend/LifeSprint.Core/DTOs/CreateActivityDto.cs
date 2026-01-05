@@ -27,6 +27,17 @@ public record CreateActivityDto
     public string? Description { get; init; }
 
     /// <summary>
+    /// Type of activity: Project, Epic, Story, or Task.
+    /// </summary>
+    [Required(ErrorMessage = "Activity type is required")]
+    public ActivityType Type { get; init; }
+
+    /// <summary>
+    /// Optional: Parent activity ID for hierarchy (e.g., Story belongs to Epic).
+    /// </summary>
+    public int? ParentActivityId { get; init; }
+
+    /// <summary>
     /// Is this a recurring activity? (e.g., "Weekly Planning", "Monthly Review")
     /// </summary>
     public bool IsRecurring { get; init; }

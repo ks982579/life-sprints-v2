@@ -77,7 +77,7 @@ public class ActivityServiceTests : IDisposable
 
         var dto = new CreateActivityDto
         {
-            Title = "Learn C# async/await",
+            Title = "Learn C# async/await", Type = ActivityType.Task,
             Description = "Deep dive into async programming",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
@@ -134,7 +134,7 @@ public class ActivityServiceTests : IDisposable
 
         var dto = new CreateActivityDto
         {
-            Title = "Write unit tests",
+            Title = "Write unit tests", Type = ActivityType.Task,
             Description = "Complete test coverage for ActivityService",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
@@ -169,7 +169,7 @@ public class ActivityServiceTests : IDisposable
 
         var dto = new CreateActivityDto
         {
-            Title = "Test activity",
+            Title = "Test activity", Type = ActivityType.Task,
             ContainerId = 999
         };
 
@@ -204,7 +204,7 @@ public class ActivityServiceTests : IDisposable
 
         var dto = new CreateActivityDto
         {
-            Title = "Weekly sprint planning",
+            Title = "Weekly sprint planning", Type = ActivityType.Task,
             Description = "Review and plan the week ahead",
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Weekly
@@ -243,9 +243,9 @@ public class ActivityServiceTests : IDisposable
             .ReturnsAsync(container);
 
         // Act - Create three activities
-        var result1 = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto { Title = "First" });
-        var result2 = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto { Title = "Second" });
-        var result3 = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto { Title = "Third" });
+        var result1 = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto { Title = "First", Type = ActivityType.Task });
+        var result2 = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto { Title = "Second", Type = ActivityType.Task });
+        var result3 = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto { Title = "Third", Type = ActivityType.Task });
 
         // Assert
         result1.Containers[0].Order.Should().Be(1);
@@ -276,7 +276,7 @@ public class ActivityServiceTests : IDisposable
         var activity1 = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "Activity 1",
+            Title = "Activity 1", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow
@@ -284,7 +284,7 @@ public class ActivityServiceTests : IDisposable
         var activity2 = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "Activity 2",
+            Title = "Activity 2", Type = ActivityType.Task,
             IsRecurring = true,
             RecurrenceType = RecurrenceType.Weekly,
             CreatedAt = DateTime.UtcNow
@@ -351,7 +351,7 @@ public class ActivityServiceTests : IDisposable
         var myActivity = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "My Activity",
+            Title = "My Activity", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow
@@ -359,7 +359,7 @@ public class ActivityServiceTests : IDisposable
         var otherActivity = new ActivityTemplate
         {
             UserId = "other_user",
-            Title = "Other Activity",
+            Title = "Other Activity", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow
@@ -415,7 +415,7 @@ public class ActivityServiceTests : IDisposable
         var activeActivity = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "Active Activity",
+            Title = "Active Activity", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow,
@@ -424,7 +424,7 @@ public class ActivityServiceTests : IDisposable
         var archivedActivity = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "Archived Activity",
+            Title = "Archived Activity", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow,
@@ -480,7 +480,7 @@ public class ActivityServiceTests : IDisposable
         var activity1 = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "Oldest",
+            Title = "Oldest", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow.AddDays(-2)
@@ -488,7 +488,7 @@ public class ActivityServiceTests : IDisposable
         var activity2 = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "Middle",
+            Title = "Middle", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow.AddDays(-1)
@@ -496,7 +496,7 @@ public class ActivityServiceTests : IDisposable
         var activity3 = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "Newest",
+            Title = "Newest", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow
@@ -565,7 +565,7 @@ public class ActivityServiceTests : IDisposable
         var activity = new ActivityTemplate
         {
             UserId = TestUserId,
-            Title = "Test Activity",
+            Title = "Test Activity", Type = ActivityType.Task,
             Description = "Test Description",
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
@@ -614,7 +614,7 @@ public class ActivityServiceTests : IDisposable
         var activity = new ActivityTemplate
         {
             UserId = "other_user",
-            Title = "Other User's Activity",
+            Title = "Other User's Activity", Type = ActivityType.Task,
             IsRecurring = false,
             RecurrenceType = RecurrenceType.None,
             CreatedAt = DateTime.UtcNow
