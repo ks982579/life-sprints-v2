@@ -84,7 +84,7 @@ public class ContainerService : IContainerService
     /// </remarks>
     private static (DateTime startDate, DateTime endDate) GetDateRangeForType(ContainerType type)
     {
-        var today = DateTime.UtcNow.Date;
+        var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
 
         return type switch
         {
@@ -101,8 +101,8 @@ public class ContainerService : IContainerService
     /// </summary>
     private static (DateTime startDate, DateTime endDate) GetAnnualRange(DateTime date)
     {
-        var startDate = new DateTime(date.Year, 1, 1);
-        var endDate = new DateTime(date.Year, 12, 31);
+        var startDate = DateTime.SpecifyKind(new DateTime(date.Year, 1, 1), DateTimeKind.Utc);
+        var endDate = DateTime.SpecifyKind(new DateTime(date.Year, 12, 31), DateTimeKind.Utc);
         return (startDate, endDate);
     }
 
@@ -111,8 +111,8 @@ public class ContainerService : IContainerService
     /// </summary>
     private static (DateTime startDate, DateTime endDate) GetMonthlyRange(DateTime date)
     {
-        var startDate = new DateTime(date.Year, date.Month, 1);
-        var endDate = startDate.AddMonths(1).AddDays(-1);
+        var startDate = DateTime.SpecifyKind(new DateTime(date.Year, date.Month, 1), DateTimeKind.Utc);
+        var endDate = startDate.AddDays(-1).AddMonths(1); // AddDays preserves Kind
         return (startDate, endDate);
     }
 
@@ -125,7 +125,7 @@ public class ContainerService : IContainerService
         var dayOfWeek = (int)date.DayOfWeek;
         var daysSinceMonday = dayOfWeek == 0 ? 6 : dayOfWeek - 1; // Sunday = 0 in C#, should be 6
 
-        var startDate = date.AddDays(-daysSinceMonday);
+        var startDate = date.AddDays(-daysSinceMonday); // AddDays preserves Kind
         var endDate = startDate.AddDays(6);
 
         return (startDate, endDate);
