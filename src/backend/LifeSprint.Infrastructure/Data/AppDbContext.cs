@@ -160,7 +160,10 @@ public class AppDbContext : DbContext
 
         foreach (var entry in templateEntries)
         {
-            entry.Entity.CreatedAt = now;
+            if (entry.Entity.CreatedAt == default)
+            {
+                entry.Entity.CreatedAt = now;
+            }
         }
 
         // Handle Container timestamps
@@ -169,7 +172,10 @@ public class AppDbContext : DbContext
 
         foreach (var entry in containerEntries)
         {
-            entry.Entity.CreatedAt = now;
+            if (entry.Entity.CreatedAt == default)
+            {
+                entry.Entity.CreatedAt = now;
+            }
         }
 
         // Handle ContainerActivity timestamps
@@ -178,7 +184,10 @@ public class AppDbContext : DbContext
 
         foreach (var entry in containerActivityEntries)
         {
-            entry.Entity.AddedAt = now;
+            if (entry.Entity.AddedAt == default)
+            {
+                entry.Entity.AddedAt = now;
+            }
         }
     }
 }
