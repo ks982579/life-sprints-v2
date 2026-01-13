@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using LifeSprint.Core.Interfaces;
 using LifeSprint.Core.DTOs;
 using System.Security.Claims;
@@ -17,6 +18,7 @@ namespace LifeSprint.Api.Controllers;
 /// </remarks>
 [ApiController]
 [Route("api/activities")]
+[Authorize]
 public class ActivitiesController : ControllerBase
 {
     private readonly IActivityService _activityService;

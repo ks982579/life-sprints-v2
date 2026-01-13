@@ -1,11 +1,13 @@
 using LifeSprint.Core.DTOs;
 using LifeSprint.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LifeSprint.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -22,6 +24,7 @@ public class AuthController : ControllerBase
     /// Initiates GitHub OAuth flow
     /// </summary>
     [HttpGet("github/login")]
+    [AllowAnonymous]
     public IActionResult GitHubLogin()
     {
         // Generate CSRF state token
@@ -47,6 +50,7 @@ public class AuthController : ControllerBase
     /// Handles GitHub OAuth callback
     /// </summary>
     [HttpGet("github/callback")]
+    [AllowAnonymous]
     public async Task<IActionResult> GitHubCallback([FromQuery] string code, [FromQuery] string state)
     {
         if (string.IsNullOrEmpty(code))
@@ -121,6 +125,7 @@ public class AuthController : ControllerBase
     /// Test-only login endpoint for E2E testing (Development/Test environments only)
     /// </summary>
     [HttpPost("test-login")]
+    [AllowAnonymous]
     public async Task<IActionResult> TestLogin([FromBody] TestLoginDto request)
     {
         // Only allow in Development or Test environments

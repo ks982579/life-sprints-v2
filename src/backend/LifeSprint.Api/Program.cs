@@ -1,7 +1,9 @@
 using LifeSprint.Infrastructure.Data;
 using LifeSprint.Infrastructure.Services;
 using LifeSprint.Core.Interfaces;
+using LifeSprint.Api.Authentication;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Authentication services
 builder.Services.AddScoped<IAuthService, GitHubAuthService>();
+
+// Configure authentication with custom session handler
+builder.Services.AddAuthentication("SessionScheme")
+    .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>("SessionScheme", null);
 
 // Activity management services
 builder.Services.AddScoped<IContainerService, ContainerService>();
@@ -54,6 +60,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCookiePolicy();
 app.UseCors("AllowFrontend");
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
