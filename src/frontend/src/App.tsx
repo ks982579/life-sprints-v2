@@ -13,6 +13,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | undefined>();
 
   // Load activities on mount
   useEffect(() => {
@@ -33,7 +34,7 @@ function Dashboard() {
     }
   };
 
-  const handleCreateActivity = async (activityData: {
+  const handleSaveActivity = async (activityData: {
     title: string;
     description?: string;
     type: ActivityType;
@@ -43,12 +44,40 @@ function Dashboard() {
   }) => {
     try {
       setError(null);
-      await activityService.createActivity(activityData);
+      if (editingActivity) {
+        // Update existing activity
+        await activityService.updateActivity(editingActivity.id, activityData);
+      } else {
+        // Create new activity
+        await activityService.createActivity(activityData);
+      }
       await loadActivities();
       setShowEditor(false);
+      setEditingActivity(undefined);
     } catch (err) {
-      setError('Failed to create activity. Please try again.');
-      console.error('Error creating activity:', err);
+      setError(editingActivity ? 'Failed to update activity. Please try again.' : 'Failed to create activity. Please try again.');
+      console.error('Error saving activity:', err);
+    }
+  };
+
+  const handleEditActivity = (activity: Activity) => {
+    setEditingActivity(activity);
+    setShowEditor(true);
+  };
+
+  const handleCancelEditor = () => {
+    setShowEditor(false);
+    setEditingActivity(undefined);
+  };
+
+  const handleDeleteActivity = async (activityId: number) => {
+    try {
+      setError(null);
+      await activityService.deleteActivity(activityId);
+      await loadActivities();
+    } catch (err) {
+      setError('Failed to delete activity. Please try again.');
+      console.error('Error deleting activity:', err);
     }
   };
 
@@ -96,8 +125,9 @@ function Dashboard() {
         {showEditor && (
           <ActivityEditor
             activities={activities}
-            onSave={handleCreateActivity}
-            onCancel={() => setShowEditor(false)}
+            editingActivity={editingActivity}
+            onSave={handleSaveActivity}
+            onCancel={handleCancelEditor}
           />
         )}
 
@@ -107,6 +137,8 @@ function Dashboard() {
           <ActivityList
             activities={activities}
             containerType={activeTab}
+            onActivityClick={handleEditActivity}
+            onActivityDelete={handleDeleteActivity}
           />
         )}
       </main>

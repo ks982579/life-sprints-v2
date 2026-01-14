@@ -640,4 +640,438 @@ public class ActivityServiceTests : IDisposable
     }
 
     #endregion
+
+    #region UpdateActivityAsync Tests
+
+    [Fact]
+    public async Task UpdateActivityAsync_WithValidData_UpdatesActivity()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Annual,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddYears(1),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Original Title",
+            Description = "Original Description",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        var updateDto = new UpdateActivityDto
+        {
+            Title = "Updated Title",
+            Description = "Updated Description"
+        };
+
+        // Act
+        var result = await _service.UpdateActivityAsync(TestUserId, activity.Id, updateDto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Title.Should().Be("Updated Title");
+        result.Description.Should().Be("Updated Description");
+        result.Type.Should().Be(ActivityType.Task); // Unchanged
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_WithPartialUpdate_OnlyUpdatesProvidedFields()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Annual,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddYears(1),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Original Title",
+            Description = "Original Description",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        var updateDto = new UpdateActivityDto
+        {
+            Title = "Updated Title"
+            // Other fields null - should not change
+        };
+
+        // Act
+        var result = await _service.UpdateActivityAsync(TestUserId, activity.Id, updateDto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Title.Should().Be("Updated Title");
+        result.Description.Should().Be("Original Description"); // Unchanged
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_WithNonExistentActivity_ReturnsNull()
+    {
+        // Arrange
+        var updateDto = new UpdateActivityDto
+        {
+            Title = "Updated Title"
+        };
+
+        // Act
+        var result = await _service.UpdateActivityAsync(TestUserId, 999, updateDto);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_WithOtherUsersActivity_ReturnsNull()
+    {
+        // Arrange
+        var activity = new ActivityTemplate
+        {
+            UserId = "other_user",
+            Title = "Other User's Activity",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        var updateDto = new UpdateActivityDto
+        {
+            Title = "Hacked Title"
+        };
+
+        // Act
+        var result = await _service.UpdateActivityAsync(TestUserId, activity.Id, updateDto);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_WithValidParent_UpdatesParent()
+    {
+        // Arrange
+        var parentProject = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Parent Project",
+            Type = ActivityType.Project,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(parentProject);
+        await _context.SaveChangesAsync();
+
+        var epic = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Epic Without Parent",
+            Type = ActivityType.Epic,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(epic);
+        await _context.SaveChangesAsync();
+
+        var updateDto = new UpdateActivityDto
+        {
+            ParentActivityId = parentProject.Id
+        };
+
+        // Act
+        var result = await _service.UpdateActivityAsync(TestUserId, epic.Id, updateDto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.ParentActivityId.Should().Be(parentProject.Id);
+        result.ParentActivityTitle.Should().Be("Parent Project");
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_WithInvalidParent_ThrowsException()
+    {
+        // Arrange
+        var task = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Task",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(task);
+
+        var project = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Project",
+            Type = ActivityType.Project,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(project);
+        await _context.SaveChangesAsync();
+
+        var updateDto = new UpdateActivityDto
+        {
+            ParentActivityId = project.Id // Task cannot be child of Project
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await _service.UpdateActivityAsync(TestUserId, task.Id, updateDto));
+
+        exception.Message.Should().Contain("Invalid hierarchy");
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_WithCircularReference_ThrowsException()
+    {
+        // Arrange: Create Project -> Epic -> Story hierarchy
+        var project = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Project",
+            Type = ActivityType.Project,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(project);
+        await _context.SaveChangesAsync();
+
+        var epic = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Epic",
+            Type = ActivityType.Epic,
+            ParentActivityId = project.Id,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(epic);
+        await _context.SaveChangesAsync();
+
+        var story = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Story",
+            Type = ActivityType.Story,
+            ParentActivityId = epic.Id,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(story);
+        await _context.SaveChangesAsync();
+
+        // Try to make Project a child of Story (circular)
+        var updateDto = new UpdateActivityDto
+        {
+            ParentActivityId = story.Id
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await _service.UpdateActivityAsync(TestUserId, project.Id, updateDto));
+
+        exception.Message.Should().Contain("circular reference");
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_ChangeTypeWithInvalidChildren_ThrowsException()
+    {
+        // Arrange: Create Epic with a Story child
+        var epic = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Epic",
+            Type = ActivityType.Epic,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(epic);
+        await _context.SaveChangesAsync();
+
+        var story = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Story",
+            Type = ActivityType.Story,
+            ParentActivityId = epic.Id,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(story);
+        await _context.SaveChangesAsync();
+
+        // Try to change Epic to Task (Story cannot be child of Task)
+        var updateDto = new UpdateActivityDto
+        {
+            Type = ActivityType.Task
+        };
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await _service.UpdateActivityAsync(TestUserId, epic.Id, updateDto));
+
+        exception.Message.Should().Contain("would invalidate child activity");
+    }
+
+    #endregion
+
+    #region ArchiveActivityAsync Tests
+
+    [Fact]
+    public async Task ArchiveActivityAsync_WithValidActivity_ArchivesSuccessfully()
+    {
+        // Arrange
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Activity to Archive",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.ArchiveActivityAsync(TestUserId, activity.Id);
+
+        // Assert
+        result.Should().BeTrue();
+
+        // Verify the activity was archived
+        var archivedActivity = await _context.ActivityTemplates.FindAsync(activity.Id);
+        archivedActivity.Should().NotBeNull();
+        archivedActivity!.ArchivedAt.Should().NotBeNull();
+        archivedActivity.ArchivedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ArchiveActivityAsync_WithNonExistentActivity_ReturnsFalse()
+    {
+        // Act
+        var result = await _service.ArchiveActivityAsync(TestUserId, 999);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ArchiveActivityAsync_WithOtherUsersActivity_ReturnsFalse()
+    {
+        // Arrange
+        var activity = new ActivityTemplate
+        {
+            UserId = "other_user",
+            Title = "Other User's Activity",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.ArchiveActivityAsync(TestUserId, activity.Id);
+
+        // Assert
+        result.Should().BeFalse();
+
+        // Verify the activity was NOT archived
+        var unchangedActivity = await _context.ActivityTemplates.FindAsync(activity.Id);
+        unchangedActivity!.ArchivedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetActivitiesForUserAsync_DoesNotReturnArchivedActivities_AfterArchiving()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Annual,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddYears(1),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        _mockContainerService
+            .Setup(x => x.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual))
+            .ReturnsAsync(container);
+
+        // Create two activities
+        var activity1 = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Active Activity",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None
+        });
+
+        var activity2 = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Activity to Archive",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None
+        });
+
+        // Archive one activity
+        await _service.ArchiveActivityAsync(TestUserId, activity2.Id);
+
+        // Act
+        var activities = await _service.GetActivitiesForUserAsync(TestUserId);
+
+        // Assert
+        activities.Should().HaveCount(1);
+        activities[0].Id.Should().Be(activity1.Id);
+        activities[0].Title.Should().Be("Active Activity");
+    }
+
+    #endregion
 }

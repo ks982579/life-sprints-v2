@@ -63,3 +63,12 @@ export interface CreateActivityDto {
   recurrenceType?: RecurrenceType;
   containerId?: number;
 }
+
+export interface UpdateActivityDto {
+  title?: string;
+  description?: string;
+  type?: ActivityType;
+  parentActivityId?: number;
+  isRecurring?: boolean;
+  recurrenceType?: RecurrenceType;
+}

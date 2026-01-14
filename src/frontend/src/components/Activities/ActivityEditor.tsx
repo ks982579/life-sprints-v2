@@ -4,6 +4,7 @@ import './ActivityEditor.css';
 
 interface ActivityEditorProps {
   activities: Activity[];
+  editingActivity?: Activity; // Optional: if provided, we're editing
   onSave: (activity: {
     title: string;
     description?: string;
@@ -38,17 +39,19 @@ const validParentTypes: Record<number, ActivityType[]> = {
   [ActivityType.Task]: [ActivityType.Story, ActivityType.Epic],
 };
 
-export function ActivityEditor({ activities, onSave, onCancel }: ActivityEditorProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [type, setType] = useState<ActivityType>(ActivityType.Task);
-  const [parentActivityId, setParentActivityId] = useState<number | undefined>();
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(RecurrenceType.None);
+export function ActivityEditor({ activities, editingActivity, onSave, onCancel }: ActivityEditorProps) {
+  const [title, setTitle] = useState(editingActivity?.title || '');
+  const [description, setDescription] = useState(editingActivity?.description || '');
+  const [type, setType] = useState<ActivityType>(editingActivity?.type || ActivityType.Task);
+  const [parentActivityId, setParentActivityId] = useState<number | undefined>(editingActivity?.parentActivityId);
+  const [isRecurring, setIsRecurring] = useState(editingActivity?.isRecurring || false);
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(editingActivity?.recurrenceType || RecurrenceType.None);
 
   // Get potential parent activities based on selected type
+  // When editing, exclude the current activity itself and its descendants
   const potentialParents = activities.filter((activity) =>
-    validParentTypes[type].includes(activity.type)
+    validParentTypes[type].includes(activity.type) &&
+    activity.id !== editingActivity?.id
   );
 
   // Reset parent selection when type changes
@@ -195,7 +198,7 @@ export function ActivityEditor({ activities, onSave, onCancel }: ActivityEditorP
             Cancel
           </button>
           <button type="submit" className="save-button" disabled={!title.trim()}>
-            Create Activity
+            {editingActivity ? 'Update Activity' : 'Create Activity'}
           </button>
         </div>
       </form>

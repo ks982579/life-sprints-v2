@@ -38,4 +38,24 @@ public interface IActivityService
     /// <param name="activityId">Activity template ID</param>
     /// <returns>Activity or null if not found/unauthorized</returns>
     Task<ActivityResponseDto?> GetActivityByIdAsync(string userId, int activityId);
+
+    /// <summary>
+    /// Updates an existing activity template.
+    /// </summary>
+    /// <param name="userId">User ID (for authorization)</param>
+    /// <param name="activityId">Activity template ID to update</param>
+    /// <param name="dto">Updated activity details</param>
+    /// <returns>Updated activity or null if not found/unauthorized</returns>
+    /// <exception cref="UnauthorizedAccessException">Thrown when user doesn't own the activity</exception>
+    /// <exception cref="InvalidOperationException">Thrown when hierarchy validation fails</exception>
+    Task<ActivityResponseDto?> UpdateActivityAsync(string userId, int activityId, UpdateActivityDto dto);
+
+    /// <summary>
+    /// Archives (soft deletes) an activity template by setting ArchivedAt timestamp.
+    /// Archived activities are excluded from normal queries but can be recovered.
+    /// </summary>
+    /// <param name="userId">User ID (for authorization)</param>
+    /// <param name="activityId">Activity template ID to archive</param>
+    /// <returns>True if archived successfully, false if not found or unauthorized</returns>
+    Task<bool> ArchiveActivityAsync(string userId, int activityId);
 }

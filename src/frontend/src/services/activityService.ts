@@ -1,5 +1,5 @@
 import { api } from './api';
-import { type Activity, type CreateActivityDto } from '../types';
+import { type Activity, type CreateActivityDto, type UpdateActivityDto } from '../types';
 
 export const activityService = {
   // Get all activities for the current user
@@ -17,12 +17,12 @@ export const activityService = {
     return api.post<Activity>('/activities', dto);
   },
 
-  // Update an existing activity (placeholder for future)
-  updateActivity: async (id: number, dto: Partial<CreateActivityDto>): Promise<Activity> => {
+  // Update an existing activity
+  updateActivity: async (id: number, dto: UpdateActivityDto): Promise<Activity> => {
     return api.put<Activity>(`/activities/${id}`, dto);
   },
 
-  // Delete an activity (placeholder for future)
+  // Delete (archive) an activity
   deleteActivity: async (id: number): Promise<void> => {
     return api.delete(`/activities/${id}`);
   },

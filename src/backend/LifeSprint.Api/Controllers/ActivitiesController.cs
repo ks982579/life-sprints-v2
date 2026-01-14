@@ -117,6 +117,75 @@ public class ActivitiesController : ControllerBase
     }
 
     /// <summary>
+    /// Updates an existing activity.
+    /// </summary>
+    /// <param name="id">Activity template ID</param>
+    /// <param name="dto">Updated activity details</param>
+    /// <returns>Updated activity</returns>
+    /// <response code="200">Activity updated successfully</response>
+    /// <response code="400">Invalid request data or validation failed</response>
+    /// <response code="404">Activity not found or access denied</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateActivity(int id, [FromBody] UpdateActivityDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var userId = GetCurrentUserId();
+            var updatedActivity = await _activityService.UpdateActivityAsync(userId, id, dto);
+
+            if (updatedActivity == null)
+            {
+                return NotFound(new { message = "Activity not found or access denied" });
+            }
+
+            return Ok(updatedActivity);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while updating the activity" });
+        }
+    }
+
+    /// <summary>
+    /// Archives (soft deletes) an activity.
+    /// </summary>
+    /// <param name="id">Activity template ID</param>
+    /// <returns>No content on success</returns>
+    /// <response code="204">Activity archived successfully</response>
+    /// <response code="404">Activity not found or access denied</response>
+    /// <response code="500">Internal server error</response>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteActivity(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var success = await _activityService.ArchiveActivityAsync(userId, id);
+
+            if (!success)
+            {
+                return NotFound(new { message = "Activity not found or access denied" });
+            }
+
+            return NoContent();
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while deleting the activity" });
+        }
+    }
+
+    /// <summary>
     /// Gets the current user's ID from the authenticated claims.
     /// </summary>
     /// <returns>User ID</returns>

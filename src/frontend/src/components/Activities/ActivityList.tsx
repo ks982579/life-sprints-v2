@@ -5,6 +5,7 @@ interface ActivityListProps {
   activities: Activity[];
   containerType: ContainerType;
   onActivityClick?: (activity: Activity) => void;
+  onActivityDelete?: (activityId: number) => void;
 }
 
 const activityTypeLabels: Record<number, string> = {
@@ -21,7 +22,13 @@ const activityTypeColors: Record<number, string> = {
   [ActivityType.Task]: '#4caf50',
 };
 
-export function ActivityList({ activities, containerType, onActivityClick }: ActivityListProps) {
+export function ActivityList({ activities, containerType, onActivityClick, onActivityDelete }: ActivityListProps) {
+  const handleDelete = (e: React.MouseEvent, activityId: number) => {
+    e.stopPropagation(); // Prevent triggering onClick
+    if (window.confirm('Are you sure you want to delete this activity? This cannot be undone.')) {
+      onActivityDelete?.(activityId);
+    }
+  };
   // Filter activities that belong to the selected container type
   const filteredActivities = activities.filter((activity) =>
     activity.containers.some((container) => container.containerType === containerType)
@@ -83,6 +90,16 @@ export function ActivityList({ activities, containerType, onActivityClick }: Act
             <div className="activity-recurring">
               <span className="recurring-badge">Recurring</span>
             </div>
+          )}
+
+          {onActivityDelete && (
+            <button
+              className="delete-button"
+              onClick={(e) => handleDelete(e, activity.id)}
+              title="Delete activity"
+            >
+              Delete
+            </button>
           )}
         </div>
       ))}
