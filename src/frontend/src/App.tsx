@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { BacklogTabs, ActivityList, ActivityEditor } from './components/Activities';
+import { ContainerSelector } from './components/Containers/ContainerSelector';
 import { activityService } from './services/activityService';
-import { ContainerType, ActivityType, RecurrenceType, type Activity } from './types';
+import { ContainerType, ActivityType, RecurrenceType, type Activity, type Container } from './types';
 import './App.css';
 
 function Dashboard() {
@@ -14,6 +15,8 @@ function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | undefined>();
+  const [showContainerSelector, setShowContainerSelector] = useState(false);
+  const [selectedContainer, setSelectedContainer] = useState<Container | undefined>();
 
   // Load activities on mount
   useEffect(() => {
@@ -81,6 +84,33 @@ function Dashboard() {
     }
   };
 
+  const handleToggleCompletion = async (activityId: number, containerId: number, isCompleted: boolean) => {
+    try {
+      setError(null);
+      await activityService.toggleCompletion(activityId, containerId, isCompleted);
+      await loadActivities();
+    } catch (err) {
+      setError('Failed to toggle completion status. Please try again.');
+      console.error('Error toggling completion:', err);
+    }
+  };
+
+  const handleSelectContainer = (container: Container) => {
+    setSelectedContainer(container);
+    setShowContainerSelector(false);
+  };
+
+  const handleClearContainerSelection = () => {
+    setSelectedContainer(undefined);
+  };
+
+  // Filter activities based on selected container or active tab
+  const filteredActivities = selectedContainer
+    ? activities.filter((activity) =>
+        activity.containers.some((ca) => ca.containerId === selectedContainer.id)
+      )
+    : activities;
+
   return (
     <div className="dashboard">
       <header className="dashboard-header">
@@ -103,13 +133,33 @@ function Dashboard() {
       <main className="dashboard-content">
         <div className="content-header">
           <h2>Your Backlogs</h2>
-          <button
-            onClick={() => setShowEditor(!showEditor)}
-            className="create-button"
-          >
-            {showEditor ? 'Cancel' : 'Create New Item'}
-          </button>
+          <div className="header-actions">
+            <button
+              onClick={() => setShowContainerSelector(!showContainerSelector)}
+              className="view-history-button"
+            >
+              {showContainerSelector ? 'Hide History' : 'View History'}
+            </button>
+            <button
+              onClick={() => setShowEditor(!showEditor)}
+              className="create-button"
+            >
+              {showEditor ? 'Cancel' : 'Create New Item'}
+            </button>
+          </div>
         </div>
+
+        {selectedContainer && (
+          <div className="selected-container-banner">
+            <span>
+              Viewing: {new Date(selectedContainer.startDate).toLocaleDateString()}
+              {selectedContainer.endDate && ` - ${new Date(selectedContainer.endDate).toLocaleDateString()}`}
+            </span>
+            <button onClick={handleClearContainerSelection} className="clear-selection-button">
+              View Current
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="error-message">
@@ -121,6 +171,14 @@ function Dashboard() {
         )}
 
         <BacklogTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {showContainerSelector && (
+          <ContainerSelector
+            selectedContainerId={selectedContainer?.id}
+            onSelectContainer={handleSelectContainer}
+            containerType={activeTab}
+          />
+        )}
 
         {showEditor && (
           <ActivityEditor
@@ -135,10 +193,11 @@ function Dashboard() {
           <div className="loading">Loading activities...</div>
         ) : (
           <ActivityList
-            activities={activities}
+            activities={filteredActivities}
             containerType={activeTab}
             onActivityClick={handleEditActivity}
             onActivityDelete={handleDeleteActivity}
+            onToggleCompletion={handleToggleCompletion}
           />
         )}
       </main>

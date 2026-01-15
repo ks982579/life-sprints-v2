@@ -1,4 +1,5 @@
 using LifeSprint.Core;
+using LifeSprint.Core.DTOs;
 using LifeSprint.Core.Interfaces;
 using LifeSprint.Core.Models;
 using LifeSprint.Infrastructure.Data;
@@ -66,10 +67,55 @@ public class ContainerService : IContainerService
     /// <summary>
     /// Gets a container by ID with authorization check.
     /// </summary>
-    public async Task<Container?> GetContainerAsync(string userId, int containerId)
+    public async Task<ContainerResponseDto?> GetContainerAsync(string userId, int containerId)
     {
-        return await _context.Containers
+        var container = await _context.Containers
+            .Include(c => c.ContainerActivities)
             .FirstOrDefaultAsync(c => c.Id == containerId && c.UserId == userId);
+
+        return container == null ? null : MapToDto(container);
+    }
+
+    /// <summary>
+    /// Gets all containers for a user, optionally filtered by type.
+    /// Returns containers ordered by start date descending (most recent first).
+    /// </summary>
+    public async Task<List<ContainerResponseDto>> GetContainersForUserAsync(string userId, ContainerType? type = null)
+    {
+        var query = _context.Containers
+            .Include(c => c.ContainerActivities)
+            .Where(c => c.UserId == userId);
+
+        if (type.HasValue)
+        {
+            query = query.Where(c => c.Type == type.Value);
+        }
+
+        var containers = await query
+            .OrderByDescending(c => c.StartDate)
+            .ToListAsync();
+
+        return containers.Select(MapToDto).ToList();
+    }
+
+    /// <summary>
+    /// Updates the status of a container.
+    /// </summary>
+    public async Task<ContainerResponseDto?> UpdateContainerStatusAsync(string userId, int containerId, ContainerStatus status)
+    {
+        var container = await _context.Containers
+            .Include(c => c.ContainerActivities)
+            .FirstOrDefaultAsync(c => c.Id == containerId && c.UserId == userId);
+
+        if (container == null)
+        {
+            return null; // Not found or unauthorized
+        }
+
+        container.Status = status;
+        await _context.SaveChangesAsync();
+
+        return MapToDto(container);
     }
 
     /// <summary>
@@ -129,5 +175,29 @@ public class ContainerService : IContainerService
         var endDate = startDate.AddDays(6);
 
         return (startDate, endDate);
+    }
+
+    /// <summary>
+    /// Maps a Container entity to ContainerResponseDto with activity counts.
+    /// </summary>
+    private static ContainerResponseDto MapToDto(Container container)
+    {
+        var totalActivities = container.ContainerActivities.Count;
+        var completedActivities = container.ContainerActivities.Count(ca => ca.CompletedAt != null);
+
+        return new ContainerResponseDto
+        {
+            Id = container.Id,
+            UserId = container.UserId,
+            Type = container.Type,
+            StartDate = container.StartDate,
+            EndDate = container.EndDate,
+            Status = container.Status,
+            Comments = container.Comments,
+            CreatedAt = container.CreatedAt,
+            ArchivedAt = container.ArchivedAt,
+            TotalActivities = totalActivities,
+            CompletedActivities = completedActivities
+        };
     }
 }

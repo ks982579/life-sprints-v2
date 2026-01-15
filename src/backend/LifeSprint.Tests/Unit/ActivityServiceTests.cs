@@ -1074,4 +1074,188 @@ public class ActivityServiceTests : IDisposable
     }
 
     #endregion
+
+    #region ToggleActivityCompletionAsync Tests
+
+    [Fact]
+    public async Task ToggleActivityCompletionAsync_MarkAsCompleted_SetsCompletedAt()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Annual,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddYears(1),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        _mockContainerService
+            .Setup(x => x.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual))
+            .ReturnsAsync(container);
+
+        var createdActivity = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Task to Complete",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None
+        });
+
+        // Act
+        var result = await _service.ToggleActivityCompletionAsync(TestUserId, createdActivity.Id, container.Id, true);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Containers.Should().HaveCount(1);
+        result.Containers[0].CompletedAt.Should().NotBeNull();
+        result.Containers[0].CompletedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ToggleActivityCompletionAsync_MarkAsIncomplete_ClearsCompletedAt()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Annual,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddYears(1),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        _mockContainerService
+            .Setup(x => x.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual))
+            .ReturnsAsync(container);
+
+        var createdActivity = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Task to Complete",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None
+        });
+
+        // Mark as completed first
+        await _service.ToggleActivityCompletionAsync(TestUserId, createdActivity.Id, container.Id, true);
+
+        // Act - Mark as incomplete
+        var result = await _service.ToggleActivityCompletionAsync(TestUserId, createdActivity.Id, container.Id, false);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Containers.Should().HaveCount(1);
+        result.Containers[0].CompletedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ToggleActivityCompletionAsync_WithInvalidActivityId_ReturnsNull()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Annual,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddYears(1),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.ToggleActivityCompletionAsync(TestUserId, 999, container.Id, true);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ToggleActivityCompletionAsync_WithInvalidContainerId_ThrowsException()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Annual,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddYears(1),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        _mockContainerService
+            .Setup(x => x.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual))
+            .ReturnsAsync(container);
+
+        var createdActivity = await _service.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Task",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None
+        });
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await _service.ToggleActivityCompletionAsync(TestUserId, createdActivity.Id, 999, true));
+
+        exception.Message.Should().Contain("not associated with container");
+    }
+
+    [Fact]
+    public async Task ToggleActivityCompletionAsync_WithOtherUsersActivity_ReturnsNull()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = "other_user",
+            Type = ContainerType.Annual,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddYears(1),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+
+        var activity = new ActivityTemplate
+        {
+            UserId = "other_user",
+            Title = "Other User's Activity",
+            Type = ActivityType.Task,
+            IsRecurring = false,
+            RecurrenceType = RecurrenceType.None,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        var containerActivity = new ContainerActivity
+        {
+            ContainerId = container.Id,
+            ActivityTemplateId = activity.Id,
+            AddedAt = DateTime.UtcNow,
+            Order = 1
+        };
+        await _context.ContainerActivities.AddAsync(containerActivity);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.ToggleActivityCompletionAsync(TestUserId, activity.Id, container.Id, true);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    #endregion
 }

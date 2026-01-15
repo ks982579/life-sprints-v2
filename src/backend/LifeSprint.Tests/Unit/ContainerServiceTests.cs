@@ -238,4 +238,284 @@ public class ContainerServiceTests : IDisposable
     }
 
     #endregion
+
+    #region GetContainersForUserAsync Tests
+
+    [Fact]
+    public async Task GetContainersForUserAsync_WithNoContainers_ReturnsEmptyList()
+    {
+        // Act
+        var result = await _service.GetContainersForUserAsync(TestUserId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetContainersForUserAsync_WithMultipleContainers_ReturnsAllOrderedByStartDate()
+    {
+        // Arrange
+        var container1 = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Weekly,
+            StartDate = DateTime.UtcNow.Date.AddDays(-14),
+            EndDate = DateTime.UtcNow.Date.AddDays(-8),
+            Status = ContainerStatus.Completed,
+            CreatedAt = DateTime.UtcNow.AddDays(-14)
+        };
+        var container2 = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Weekly,
+            StartDate = DateTime.UtcNow.Date.AddDays(-7),
+            EndDate = DateTime.UtcNow.Date.AddDays(-1),
+            Status = ContainerStatus.Completed,
+            CreatedAt = DateTime.UtcNow.AddDays(-7)
+        };
+        var container3 = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Weekly,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddDays(6),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddRangeAsync(container1, container2, container3);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.GetContainersForUserAsync(TestUserId);
+
+        // Assert
+        result.Should().HaveCount(3);
+        result[0].Id.Should().Be(container3.Id); // Most recent first
+        result[1].Id.Should().Be(container2.Id);
+        result[2].Id.Should().Be(container1.Id);
+    }
+
+    [Fact]
+    public async Task GetContainersForUserAsync_WithTypeFilter_ReturnsOnlyMatchingType()
+    {
+        // Arrange
+        var weeklyContainer = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Weekly,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddDays(6),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        var annualContainer = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Annual,
+            StartDate = new DateTime(DateTime.UtcNow.Year, 1, 1),
+            EndDate = new DateTime(DateTime.UtcNow.Year, 12, 31),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddRangeAsync(weeklyContainer, annualContainer);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.GetContainersForUserAsync(TestUserId, ContainerType.Weekly);
+
+        // Assert
+        result.Should().HaveCount(1);
+        result[0].Type.Should().Be(ContainerType.Weekly);
+        result[0].Id.Should().Be(weeklyContainer.Id);
+    }
+
+    [Fact]
+    public async Task GetContainersForUserAsync_WithDifferentUser_ReturnsOnlyOwnContainers()
+    {
+        // Arrange
+        var ownContainer = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Daily,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date,
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        var otherContainer = new Container
+        {
+            UserId = "other_user",
+            Type = ContainerType.Daily,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date,
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddRangeAsync(ownContainer, otherContainer);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.GetContainersForUserAsync(TestUserId);
+
+        // Assert
+        result.Should().HaveCount(1);
+        result[0].UserId.Should().Be(TestUserId);
+    }
+
+    [Fact]
+    public async Task GetContainersForUserAsync_ReturnsActivityCounts()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Weekly,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddDays(6),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var activity1 = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Activity 1",
+            Type = ActivityType.Task,
+            CreatedAt = DateTime.UtcNow
+        };
+        var activity2 = new ActivityTemplate
+        {
+            UserId = TestUserId,
+            Title = "Activity 2",
+            Type = ActivityType.Task,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddRangeAsync(activity1, activity2);
+        await _context.SaveChangesAsync();
+
+        var containerActivity1 = new ContainerActivity
+        {
+            ContainerId = container.Id,
+            ActivityTemplateId = activity1.Id,
+            AddedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow, // Completed
+            Order = 0
+        };
+        var containerActivity2 = new ContainerActivity
+        {
+            ContainerId = container.Id,
+            ActivityTemplateId = activity2.Id,
+            AddedAt = DateTime.UtcNow,
+            CompletedAt = null, // Not completed
+            Order = 1
+        };
+        await _context.ContainerActivities.AddRangeAsync(containerActivity1, containerActivity2);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.GetContainersForUserAsync(TestUserId);
+
+        // Assert
+        result.Should().HaveCount(1);
+        result[0].TotalActivities.Should().Be(2);
+        result[0].CompletedActivities.Should().Be(1);
+    }
+
+    #endregion
+
+    #region UpdateContainerStatusAsync Tests
+
+    [Fact]
+    public async Task UpdateContainerStatusAsync_WithValidContainer_UpdatesStatus()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Weekly,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddDays(6),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.UpdateContainerStatusAsync(TestUserId, container.Id, ContainerStatus.Completed);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(ContainerStatus.Completed);
+
+        // Verify database was updated
+        var updatedContainer = await _context.Containers.FindAsync(container.Id);
+        updatedContainer!.Status.Should().Be(ContainerStatus.Completed);
+    }
+
+    [Fact]
+    public async Task UpdateContainerStatusAsync_WithWrongUserId_ReturnsNull()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = "other_user",
+            Type = ContainerType.Weekly,
+            StartDate = DateTime.UtcNow.Date,
+            EndDate = DateTime.UtcNow.Date.AddDays(6),
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        // Act - Try to update another user's container
+        var result = await _service.UpdateContainerStatusAsync(TestUserId, container.Id, ContainerStatus.Completed);
+
+        // Assert
+        result.Should().BeNull();
+
+        // Verify database was not updated
+        var unchangedContainer = await _context.Containers.FindAsync(container.Id);
+        unchangedContainer!.Status.Should().Be(ContainerStatus.Active);
+    }
+
+    [Fact]
+    public async Task UpdateContainerStatusAsync_WithNonExistentContainer_ReturnsNull()
+    {
+        // Act
+        var result = await _service.UpdateContainerStatusAsync(TestUserId, 999, ContainerStatus.Completed);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateContainerStatusAsync_ToArchived_UpdatesStatus()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId,
+            Type = ContainerType.Monthly,
+            StartDate = new DateTime(2025, 1, 1),
+            EndDate = new DateTime(2025, 1, 31),
+            Status = ContainerStatus.Completed,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.UpdateContainerStatusAsync(TestUserId, container.Id, ContainerStatus.Archived);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(ContainerStatus.Archived);
+    }
+
+    #endregion
 }

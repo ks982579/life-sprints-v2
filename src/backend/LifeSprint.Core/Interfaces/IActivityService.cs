@@ -58,4 +58,15 @@ public interface IActivityService
     /// <param name="activityId">Activity template ID to archive</param>
     /// <returns>True if archived successfully, false if not found or unauthorized</returns>
     Task<bool> ArchiveActivityAsync(string userId, int activityId);
+
+    /// <summary>
+    /// Toggles the completion status of an activity within a specific container.
+    /// Sets or clears the CompletedAt timestamp on the ContainerActivity record.
+    /// </summary>
+    /// <param name="userId">User ID (for authorization)</param>
+    /// <param name="activityId">Activity template ID</param>
+    /// <param name="containerId">Container ID where the activity should be toggled</param>
+    /// <param name="isCompleted">True to mark as completed, false to mark as incomplete</param>
+    /// <returns>Updated activity or null if not found/unauthorized</returns>
+    Task<ActivityResponseDto?> ToggleActivityCompletionAsync(string userId, int activityId, int containerId, bool isCompleted);
 }

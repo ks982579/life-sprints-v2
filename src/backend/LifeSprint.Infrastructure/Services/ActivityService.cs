@@ -70,7 +70,8 @@ public class ActivityService : IActivityService
         if (dto.ContainerId.HasValue)
         {
             // Use specified container (with authorization check)
-            var specifiedContainer = await _containerService.GetContainerAsync(userId, dto.ContainerId.Value);
+            var specifiedContainer = await _context.Containers
+                .FirstOrDefaultAsync(c => c.Id == dto.ContainerId.Value && c.UserId == userId);
             if (specifiedContainer == null)
             {
                 throw new UnauthorizedAccessException($"Container {dto.ContainerId} not found or unauthorized");
@@ -258,6 +259,45 @@ public class ActivityService : IActivityService
         await _context.SaveChangesAsync();
 
         return true;
+    }
+
+    /// <summary>
+    /// Toggles the completion status of an activity within a specific container.
+    /// </summary>
+    public async Task<ActivityResponseDto?> ToggleActivityCompletionAsync(string userId, int activityId, int containerId, bool isCompleted)
+    {
+        // Fetch the activity with authorization check
+        var activity = await _context.ActivityTemplates
+            .FirstOrDefaultAsync(at => at.Id == activityId && at.UserId == userId);
+
+        if (activity == null)
+        {
+            return null; // Not found or unauthorized
+        }
+
+        // Find the ContainerActivity record
+        var containerActivity = await _context.ContainerActivities
+            .Include(ca => ca.Container)
+            .FirstOrDefaultAsync(ca => ca.ActivityTemplateId == activityId && ca.ContainerId == containerId);
+
+        if (containerActivity == null)
+        {
+            throw new InvalidOperationException($"Activity {activityId} is not associated with container {containerId}");
+        }
+
+        // Verify the container belongs to the user
+        if (containerActivity.Container.UserId != userId)
+        {
+            return null; // Unauthorized access to container
+        }
+
+        // Toggle completion status
+        containerActivity.CompletedAt = isCompleted ? DateTime.UtcNow : null;
+
+        await _context.SaveChangesAsync();
+
+        // Return the updated activity with all associations
+        return await GetActivityByIdAsync(userId, activityId);
     }
 
     /// <summary>

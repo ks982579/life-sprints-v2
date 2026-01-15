@@ -43,6 +43,14 @@ export const api = {
     return response.json();
   },
 
+  patch: async <T>(url: string, data: unknown): Promise<T> => {
+    const response = await fetchWithCredentials(url, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return response.json();
+  },
+
   delete: async (url: string): Promise<void> => {
     await fetchWithCredentials(url, {
       method: 'DELETE',

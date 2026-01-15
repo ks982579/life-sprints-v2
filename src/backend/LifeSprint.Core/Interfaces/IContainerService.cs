@@ -1,4 +1,5 @@
 using LifeSprint.Core.Models;
+using LifeSprint.Core.DTOs;
 
 namespace LifeSprint.Core.Interfaces;
 
@@ -35,6 +36,24 @@ public interface IContainerService
     /// </summary>
     /// <param name="userId">User ID (for authorization)</param>
     /// <param name="containerId">Container ID</param>
-    /// <returns>Container or null if not found/unauthorized</returns>
-    Task<Container?> GetContainerAsync(string userId, int containerId);
+    /// <returns>Container with activity counts or null if not found/unauthorized</returns>
+    Task<ContainerResponseDto?> GetContainerAsync(string userId, int containerId);
+
+    /// <summary>
+    /// Gets all containers for a user, optionally filtered by type.
+    /// Returns containers ordered by start date descending (most recent first).
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="type">Optional container type to filter by</param>
+    /// <returns>List of containers with activity counts</returns>
+    Task<List<ContainerResponseDto>> GetContainersForUserAsync(string userId, ContainerType? type = null);
+
+    /// <summary>
+    /// Updates the status of a container (Active -> Completed -> Archived).
+    /// </summary>
+    /// <param name="userId">User ID (for authorization)</param>
+    /// <param name="containerId">Container ID</param>
+    /// <param name="status">New status</param>
+    /// <returns>Updated container with activity counts or null if not found/unauthorized</returns>
+    Task<ContainerResponseDto?> UpdateContainerStatusAsync(string userId, int containerId, ContainerStatus status);
 }

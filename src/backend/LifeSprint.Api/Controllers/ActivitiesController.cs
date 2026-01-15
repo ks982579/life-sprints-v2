@@ -157,6 +157,46 @@ public class ActivitiesController : ControllerBase
     }
 
     /// <summary>
+    /// Toggles the completion status of an activity in a specific container.
+    /// </summary>
+    /// <param name="id">Activity template ID</param>
+    /// <param name="dto">Completion toggle details</param>
+    /// <returns>Updated activity</returns>
+    /// <response code="200">Activity completion toggled successfully</response>
+    /// <response code="400">Invalid request data or activity not in container</response>
+    /// <response code="404">Activity not found or access denied</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPatch("{id}/complete")]
+    public async Task<IActionResult> ToggleCompletion(int id, [FromBody] ToggleCompletionDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var userId = GetCurrentUserId();
+            var updatedActivity = await _activityService.ToggleActivityCompletionAsync(userId, id, dto.ContainerId, dto.IsCompleted);
+
+            if (updatedActivity == null)
+            {
+                return NotFound(new { message = "Activity not found or access denied" });
+            }
+
+            return Ok(updatedActivity);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while toggling activity completion" });
+        }
+    }
+
+    /// <summary>
     /// Archives (soft deletes) an activity.
     /// </summary>
     /// <param name="id">Activity template ID</param>

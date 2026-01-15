@@ -23,6 +23,13 @@ export const ContainerType = {
   Daily: 3 as ContainerType,
 } as const;
 
+export type ContainerStatus = 0 | 1 | 2;
+export const ContainerStatus = {
+  Active: 0 as ContainerStatus,
+  Completed: 1 as ContainerStatus,
+  Archived: 2 as ContainerStatus,
+} as const;
+
 export interface ContainerAssociation {
   containerId: number;
   containerType: ContainerType;
@@ -30,6 +37,24 @@ export interface ContainerAssociation {
   completedAt?: string;
   order: number;
   isRolledOver: boolean;
+}
+
+export interface Container {
+  id: number;
+  userId: string;
+  type: ContainerType;
+  startDate: string;
+  endDate?: string;
+  status: ContainerStatus;
+  comments?: string;
+  createdAt: string;
+  archivedAt?: string;
+  totalActivities: number;
+  completedActivities: number;
+}
+
+export interface UpdateContainerStatusDto {
+  status: ContainerStatus;
 }
 
 export interface ActivityChild {

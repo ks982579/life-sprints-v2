@@ -22,6 +22,11 @@ export const activityService = {
     return api.put<Activity>(`/activities/${id}`, dto);
   },
 
+  // Toggle completion status of an activity in a container
+  toggleCompletion: async (id: number, containerId: number, isCompleted: boolean): Promise<Activity> => {
+    return api.patch<Activity>(`/activities/${id}/complete`, { containerId, isCompleted });
+  },
+
   // Delete (archive) an activity
   deleteActivity: async (id: number): Promise<void> => {
     return api.delete(`/activities/${id}`);

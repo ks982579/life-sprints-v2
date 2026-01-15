@@ -6,6 +6,7 @@ interface ActivityListProps {
   containerType: ContainerType;
   onActivityClick?: (activity: Activity) => void;
   onActivityDelete?: (activityId: number) => void;
+  onToggleCompletion?: (activityId: number, containerId: number, isCompleted: boolean) => void;
 }
 
 const activityTypeLabels: Record<number, string> = {
@@ -22,11 +23,20 @@ const activityTypeColors: Record<number, string> = {
   [ActivityType.Task]: '#4caf50',
 };
 
-export function ActivityList({ activities, containerType, onActivityClick, onActivityDelete }: ActivityListProps) {
+export function ActivityList({ activities, containerType, onActivityClick, onActivityDelete, onToggleCompletion }: ActivityListProps) {
   const handleDelete = (e: React.MouseEvent, activityId: number) => {
     e.stopPropagation(); // Prevent triggering onClick
     if (window.confirm('Are you sure you want to delete this activity? This cannot be undone.')) {
       onActivityDelete?.(activityId);
+    }
+  };
+
+  const handleToggleCompletion = (e: React.ChangeEvent<HTMLInputElement>, activity: Activity) => {
+    e.stopPropagation(); // Prevent triggering onClick
+    const container = activity.containers.find(c => c.containerType === containerType);
+    if (container && onToggleCompletion) {
+      const isCompleted = e.target.checked;
+      onToggleCompletion(activity.id, container.containerId, isCompleted);
     }
   };
   // Filter activities that belong to the selected container type
@@ -52,21 +62,34 @@ export function ActivityList({ activities, containerType, onActivityClick, onAct
 
   return (
     <div className="activity-list">
-      {sortedActivities.map((activity) => (
-        <div
-          key={activity.id}
-          className="activity-item"
-          onClick={() => onActivityClick?.(activity)}
-        >
-          <div className="activity-header">
-            <span
-              className="activity-type-badge"
-              style={{ backgroundColor: activityTypeColors[activity.type] }}
-            >
-              {activityTypeLabels[activity.type]}
-            </span>
-            <h3 className="activity-title">{activity.title}</h3>
-          </div>
+      {sortedActivities.map((activity) => {
+        const container = activity.containers.find(c => c.containerType === containerType);
+        const isCompleted = !!container?.completedAt;
+
+        return (
+          <div
+            key={activity.id}
+            className={`activity-item ${isCompleted ? 'completed' : ''}`}
+            onClick={() => onActivityClick?.(activity)}
+          >
+            <div className="activity-header">
+              {onToggleCompletion && (
+                <label className="completion-checkbox" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={isCompleted}
+                    onChange={(e) => handleToggleCompletion(e, activity)}
+                  />
+                </label>
+              )}
+              <span
+                className="activity-type-badge"
+                style={{ backgroundColor: activityTypeColors[activity.type] }}
+              >
+                {activityTypeLabels[activity.type]}
+              </span>
+              <h3 className="activity-title">{activity.title}</h3>
+            </div>
 
           {activity.description && (
             <p className="activity-description">{activity.description}</p>
@@ -92,17 +115,18 @@ export function ActivityList({ activities, containerType, onActivityClick, onAct
             </div>
           )}
 
-          {onActivityDelete && (
-            <button
-              className="delete-button"
-              onClick={(e) => handleDelete(e, activity.id)}
-              title="Delete activity"
-            >
-              Delete
-            </button>
-          )}
-        </div>
-      ))}
+            {onActivityDelete && (
+              <button
+                className="delete-button"
+                onClick={(e) => handleDelete(e, activity.id)}
+                title="Delete activity"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
