@@ -103,16 +103,27 @@ public class ActivityService : IActivityService
     }
 
     /// <summary>
-    /// Gets all non-archived activities for a user with their container associations.
+    /// Gets all non-archived activities for a user, optionally filtered by container type.
+    /// When containerType is provided, only activities associated with at least one
+    /// container of that type are returned.
     /// </summary>
-    public async Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId)
+    public async Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null)
     {
-        var activities = await _context.ActivityTemplates
+        var query = _context.ActivityTemplates
             .Where(at => at.UserId == userId && at.ArchivedAt == null)
             .Include(at => at.ParentActivity)
             .Include(at => at.ChildActivities)
             .Include(at => at.ContainerActivities)
                 .ThenInclude(ca => ca.Container)
+            .AsQueryable();
+
+        if (containerType.HasValue)
+        {
+            query = query.Where(at =>
+                at.ContainerActivities.Any(ca => ca.Container.Type == containerType.Value));
+        }
+
+        var activities = await query
             .OrderByDescending(at => at.CreatedAt)
             .ToListAsync();
 
@@ -125,7 +136,7 @@ public class ActivityService : IActivityService
     public async Task<ActivityResponseDto?> GetActivityByIdAsync(string userId, int activityId)
     {
         var activity = await _context.ActivityTemplates
-            .Where(at => at.Id == activityId && at.UserId == userId)
+            .Where(at => at.Id == activityId && at.UserId == userId && at.ArchivedAt == null)
             .Include(at => at.ParentActivity)
             .Include(at => at.ChildActivities)
             .Include(at => at.ContainerActivities)
@@ -358,6 +369,7 @@ public class ActivityService : IActivityService
         // Define valid parent-child relationships
         var validRelationships = new Dictionary<ActivityType, List<ActivityType>>
         {
+            { ActivityType.Project, new List<ActivityType>() },
             { ActivityType.Epic, new List<ActivityType> { ActivityType.Project } },
             { ActivityType.Story, new List<ActivityType> { ActivityType.Epic, ActivityType.Project } },
             { ActivityType.Task, new List<ActivityType> { ActivityType.Story, ActivityType.Epic } }

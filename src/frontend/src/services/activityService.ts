@@ -1,10 +1,13 @@
 import { api } from './api';
-import { type Activity, type CreateActivityDto, type UpdateActivityDto } from '../types';
+import { type Activity, type CreateActivityDto, type UpdateActivityDto, type ContainerType } from '../types';
 
 export const activityService = {
-  // Get all activities for the current user
-  getActivities: async (): Promise<Activity[]> => {
-    return api.get<Activity[]>('/activities');
+  // Get all activities for the current user, optionally filtered by container type
+  getActivities: async (containerType?: ContainerType): Promise<Activity[]> => {
+    const url = containerType !== undefined
+      ? `/activities?containerType=${containerType}`
+      : '/activities';
+    return api.get<Activity[]>(url);
   },
 
   // Get a single activity by ID

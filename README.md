@@ -4,13 +4,13 @@ A sprint planning and task management application for organizing your life throu
 
 ## Tech Stack
 
-- **Backend**: .NET 9, ASP.NET Core MVC, Entity Framework Core
-- **Frontend**: TypeScript, React, Vite
+- **Backend**: .NET 10, ASP.NET Core, Entity Framework Core 10
+- **Frontend**: React 19, TypeScript, Vite, SWC
 - **Database**: PostgreSQL 16
-- **Auth**: GitHub OAuth
+- **Auth**: GitHub OAuth (cookie-based sessions)
 - **Infrastructure**: Docker, NGINX, Digital Ocean
 - **CI/CD**: GitHub Actions
-- **Testing**: xUnit, Vitest, Playwright
+- **Testing**: xUnit + FluentAssertions + Moq, Vitest + Testing Library, Playwright
 
 ## Features
 
@@ -26,7 +26,7 @@ A sprint planning and task management application for organizing your life throu
 
 ## Prerequisites
 
-- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Node.js 20+](https://nodejs.org/)
 - [Docker](https://www.docker.com/get-started) and Docker Compose
 - [Git](https://git-scm.com/)
@@ -181,19 +181,16 @@ life-sprints-v2/
 - `GET /api/auth/me` - Get current user
 
 ### Activities
-- `GET /api/activities` - List all activities (with filters)
-- `GET /api/activities/:id` - Get single activity
+- `GET /api/activities` - List activities for current user
+- `GET /api/activities?containerType={0|1|2|3}` - Filter by container type (Annual/Monthly/Weekly/Daily)
+- `GET /api/activities/{id}` - Get single activity (404 if archived)
 - `POST /api/activities` - Create activity
-- `PUT /api/activities/:id` - Update activity
-- `DELETE /api/activities/:id` - Delete activity
-- `PATCH /api/activities/:id/state` - Update state
-- `PATCH /api/activities/:id/backlog` - Update backlog flags
+- `PUT /api/activities/{id}` - Update activity
+- `PATCH /api/activities/{id}/complete` - Toggle completion in a container
+- `DELETE /api/activities/{id}` - Archive activity (soft delete)
 
-### Backlogs
-- `GET /api/backlogs/annual` - Get annual backlog
-- `GET /api/backlogs/monthly` - Get monthly backlog
-- `GET /api/backlogs/weekly` - Get weekly sprint
-- `GET /api/backlogs/daily` - Get daily checklist
+### Containers
+- `GET /api/containers/current?containerType={0|1|2|3}` - Get or create current container
 
 ## Deployment
 
@@ -261,51 +258,3 @@ MIT
 
 For issues and questions, please open a GitHub issue.
 
----
-
-Setting up project
-
-```bash
-dotnet new sln -n LifeSprint
-dotnet new webapi -n LifeSprint.Api -o LifeSprint.Api --no-https
-dotnet new classlib -n LifeSprint.Core -o LifeSprint.Core
-dotnet new classlib -n LifeSprint.Infra -o LifeSprint.Infra
-dotnet new xunit -n LifeSprint.Tests -o LifeSprint.Tests
-dotnet sln add LifeSprint.Api/LifeSprint.Api.csproj LifeSprint.Core/LifeSprint.Core.csproj LifeSprint.Infra/LifeSprint.Infra.csproj LifeSprint.Tests/LifeSprint.Tests.csproj
-
-# Projects reference each other
-dotnet add LifeSprint.Api/LifeSprint.Api.csproj reference LifeSprint.Core/LifeSprint.Core.csproj LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj \ 
-&& dotnet add LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj reference LifeSprint.Core/LifeSprint.Core.csproj \
-&& dotnet add LifeSprint.Tests/LifeSprint.Tests.csproj reference LifeSprint.Api/LifeSprint.Api.csproj LifeSprint.Core/LifeSprint.Core.csproj LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj
-
-# Get packages
-dotnet add LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj package Npgsql.EntityFrameworkCore.PostgreSQL \
-&& dotnet add LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj package Microsoft.EntityFrameworkCore.Design \
-&& dotnet add LifeSprint.Api/LifeSprint.Api.csproj package Npgsql.EntityFrameworkCore.PostgreSQL \
-&& dotnet add LifeSprint.Api/LifeSprint.Api.csproj package Microsoft.EntityFrameworkCore.Design
-
-dotnet add LifeSprint.Tests/LifeSprint.Tests.csproj package Moq \
-&& dotnet add LifeSprint.Tests/LifeSprint.Tests.csproj package FluentAssertions \
-&& dotnet add LifeSprint.Tests/LifeSprint.Tests.csproj package Microsoft.EntityFrameworkCore.InMemory
-
-dotnet add LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj package Microsoft.Extensions.Http && dotnet add LifeSprint.Tests/LifeSprint.Tests.csproj package Microsoft.Extensions.Http
-
-dotnet tool install --global dotnet-ef
-
-dotnet ef migrations add InitialCreate --project LifeSprint.Infrastructure/LifeSprint.Infrastructure.csproj --startup-project LifeSprint.Api/LifeSprint.Api.csproj
-   --output-dir Data/Migrations
-```
-
-```bash
-cd ./src
-npm create vite@latest frontend
-# Selected React and the TypeScript + SWC option
-```
-
-Docker
-
-```bash
-docker compose up -d
-docker compose logs -f
-docker compose ps
-```

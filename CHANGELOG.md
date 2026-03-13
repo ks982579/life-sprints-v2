@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Next Up - Phase 3: Core Activity CRUD
-- Backend Activity CRUD API
-- Frontend Activity components and management
-- Activity state management and backlog filtering
+### Next Up - Phase 4: Backlog Views & Navigation
+- React Router setup and dedicated route per backlog
+- Activity detail modal / inline editing workflow
+- Move activities between containers
+- Date navigation (view historical sprints)
+- MainLayout with sidebar navigation
 
 ---
 
@@ -36,38 +38,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [x] Test-only auth endpoint for E2E testing
 - [x] **Tag: v0.1.0 - Authentication Complete**
 
-### Phase 3: Core Activity CRUD (Week 2)
-- [ ] Backend API:
-  - [ ] ActivityRepository implementation
-  - [ ] ActivityService with business logic
-  - [ ] ActivitiesController with all CRUD endpoints
-  - [ ] Backlog filtering endpoints (annual/monthly/weekly/daily)
-- [ ] Frontend Components:
-  - [ ] ActivityCard component
-  - [ ] ActivityForm component
-  - [ ] ActivityList component
-  - [ ] useActivities custom hook
-  - [ ] activityService API client
-- [ ] Backend unit tests for ActivityService
-- [ ] Backend integration tests for ActivityRepository
-- [ ] Frontend component tests
+### Phase 3: Core Activity CRUD ✅ COMPLETED
+- [x] Backend API:
+  - [x] Container architecture (ActivityTemplate + Container + ContainerActivity)
+  - [x] ActivityService with full CRUD and hierarchy validation
+  - [x] ContainerService with date-range logic for all container types
+  - [x] ActivitiesController: GET, POST, PUT, PATCH (toggle), DELETE
+  - [x] Server-side backlog filtering via `?containerType=` query param
+- [x] Frontend Components:
+  - [x] BacklogTabs - tab navigation (Annual/Monthly/Weekly)
+  - [x] ActivityList - filterable, sortable activity display
+  - [x] ActivityEditor - inline create/edit form with hierarchy support
+  - [x] activityService API client with full CRUD + toggle
+- [x] Backend unit tests (80 tests)
+- [x] Backend integration tests (33 tests, sequential execution via xUnit Collection)
+- [x] Frontend Vitest unit tests (41 tests)
+- [x] **Tag: v0.2.0 - Core Activity CRUD Complete**
 
-### Phase 4: Backlog Views (Week 2)
+### Phase 4: Backlog Views & Navigation
 - [ ] Frontend routing setup (React Router)
-- [ ] AnnualBacklog component
-- [ ] MonthlyBacklog component
-- [ ] WeeklySprint component
+- [ ] AnnualBacklog, MonthlyBacklog, WeeklySprint dedicated views
 - [ ] DailyChecklist component (optional)
-- [ ] MainLayout with navigation
+- [ ] MainLayout with sidebar and navigation
 - [ ] Header with user info and logout
-- [ ] Sidebar with backlog navigation
+- [ ] Activity detail modal
+- [ ] Date navigation (view historical containers)
 
-### Phase 5: Testing Infrastructure (Week 3)
-- [ ] Playwright setup and configuration
-- [ ] E2E tests for activity management
-- [ ] E2E tests for backlog filtering
+### Phase 5: Testing Infrastructure
+- [ ] Playwright E2E tests for activity management
+- [ ] E2E tests for backlog filtering and navigation
 - [ ] E2E tests for activity state changes
-- [ ] Frontend unit tests with Vitest
 - [ ] Test coverage reporting
 
 ### Phase 6: CI/CD Pipeline (Week 4)
@@ -114,6 +114,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Version History
+
+### [0.2.0] - 2026-03-13 - Core Activity CRUD Complete
+
+#### Added - Container Architecture
+- New database schema replacing boolean backlog flags:
+  - `ActivityTemplate` - master task/goal definition with hierarchy and recurrence
+  - `Container` - unified backlog/sprint entity (Annual/Monthly/Weekly/Daily)
+  - `ContainerActivity` - junction table tracking per-container completion, ordering, and rollover
+- EF Core migration: `AddContainerArchitecture`
+- New enums: `ContainerType`, `ContainerStatus`, `RecurrenceType`, `ActivityType`
+
+#### Added - Backend Services & API
+- `IActivityService` / `ActivityService`:
+  - `CreateActivityAsync` - creates template + container association, defaults to current Annual
+  - `GetActivitiesForUserAsync` - with optional `ContainerType` filter
+  - `GetActivityByIdAsync` - excludes archived activities
+  - `UpdateActivityAsync` - patch semantics, validates hierarchy and circular references
+  - `ArchiveActivityAsync` - soft delete via `ArchivedAt`
+  - `ToggleActivityCompletionAsync` - per-container completion tracking
+- `IContainerService` / `ContainerService`:
+  - `GetOrCreateCurrentContainerAsync` - finds or creates container with correct date range
+  - Date range logic for Annual (Jan–Dec), Monthly (1st–last day), Weekly (Mon–Sun ISO 8601), Daily
+- `ActivitiesController`:
+  - `GET /api/activities?containerType={n}` - list with optional filter
+  - `GET /api/activities/{id}` - single activity (returns 404 if archived)
+  - `POST /api/activities` - create
+  - `PUT /api/activities/{id}` - update
+  - `PATCH /api/activities/{id}/complete` - toggle completion
+  - `DELETE /api/activities/{id}` - archive (soft delete)
+- `ContainersController`:
+  - `GET /api/containers/current?containerType={n}` - get or create current container
+
+#### Added - Frontend Activity Management
+- `BacklogTabs` - tab navigation for Annual / Monthly / Weekly
+- `ActivityList` - filtered by container type, sorted by `Order`, completion checkbox, delete button
+- `ActivityEditor` - inline create/edit form with type, description, recurrence, and parent-activity selection
+- `activityService` - API client for all CRUD operations and toggle completion
+- `App.tsx` - reloads activities on tab change, passes `containerType` to API
+
+#### Added - Tests
+- Backend unit tests: 80 tests (was 66)
+  - `ActivitiesControllerTests`: full coverage for GET (with filter), POST, PUT, PATCH, DELETE
+- Backend integration tests: 33 tests (was 16)
+  - `ActivityServiceIntegrationTests`: update, archive, toggle, filter by container type
+  - `ActivitiesControllerIntegrationTests`: full request/response coverage for all endpoints
+  - xUnit `[Collection("IntegrationTests")]` with `DisableParallelization = true` for test isolation
+- Frontend Vitest unit tests: 41 tests (new)
+  - `BacklogTabs.test.tsx` (5), `ActivityList.test.tsx` (13), `ActivityEditor.test.tsx` (13), `activityService.test.ts` (8)
+  - Vitest + @testing-library/react + jsdom setup
+
+#### Fixed - Bugs
+- `ContainerService.GetMonthlyRange`: wrong operator order produced incorrect end date (e.g. Mar 28 instead of Mar 31)
+- `ActivityService.ValidateHierarchy`: `Project` type was not validated, allowing Projects to silently gain a parent; fixed by adding `Project` to the valid-relationships dictionary with an empty allowed-parents list
+- `ActivityService.GetActivityByIdAsync`: did not filter out archived activities, causing `GET /activities/{id}` to return 200 after soft delete
+- Docker: backend container ran as root, creating root-owned `obj/`/`bin/` in bind-mounted source; fixed by adding `user: "${UID:-1000}:${GID:-1000}"` and dedicated NuGet/dotnet-home volumes to `docker-compose.yml`
+
+#### Technical Details
+- Activity hierarchy: Project → Epic → Story → Task (enforced in service layer)
+- Completion tracked per container via `ContainerActivity.CompletedAt`
+- Frontend TypeScript uses const+union-type pattern (required by `erasableSyntaxOnly`)
+- Integration tests use shared `[Collection]` to prevent parallel cleanup conflicts
+
+---
 
 ### [0.1.0] - 2025-12-31 - Authentication Complete
 
@@ -299,7 +362,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Notes
 
-- **Current Version**: v0.1.0 - Authentication complete ✅
-- **Next Milestone**: v0.2.0 - Core Activity CRUD and Backlog Views
+- **Current Version**: v0.2.0 - Core Activity CRUD complete ✅
+- **Next Milestone**: v0.3.0 - Backlog Views & Navigation
 - **Target for MVP**: v1.0.0 - Full CRUD, backlogs, testing, and production deployment
-- **Last Updated**: 2025-12-31
+- **Last Updated**: 2026-03-13

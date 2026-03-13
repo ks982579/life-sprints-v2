@@ -158,7 +158,7 @@ public class ContainerService : IContainerService
     private static (DateTime startDate, DateTime endDate) GetMonthlyRange(DateTime date)
     {
         var startDate = DateTime.SpecifyKind(new DateTime(date.Year, date.Month, 1), DateTimeKind.Utc);
-        var endDate = startDate.AddDays(-1).AddMonths(1); // AddDays preserves Kind
+        var endDate = startDate.AddMonths(1).AddDays(-1); // First day of next month minus 1 = last day of current month
         return (startDate, endDate);
     }
 

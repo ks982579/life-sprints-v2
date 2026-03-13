@@ -19,6 +19,7 @@ namespace LifeSprint.Tests.Integration;
 /// - Controller: LifeSprint.Api/Controllers/ActivitiesController.cs
 /// - Base: Integration/IntegrationTestBase.cs
 /// </remarks>
+[Collection("IntegrationTests")]
 public class ActivitiesControllerIntegrationTests : IntegrationTestBase
 {
     private ActivitiesController CreateController()
@@ -297,5 +298,234 @@ public class ActivitiesControllerIntegrationTests : IntegrationTestBase
         annualActivity.Containers[0].ContainerType.Should().Be(ContainerType.Annual);
         monthlyActivity.Containers[0].ContainerType.Should().Be(ContainerType.Monthly);
         weeklyActivity.Containers[0].ContainerType.Should().Be(ContainerType.Weekly);
+    }
+
+    [Fact]
+    public async Task GET_GetActivities_WithContainerTypeFilter_ReturnsOnlyMatchingActivities()
+    {
+        // Arrange
+        var controller = CreateController();
+        var containerService = new ContainerService(Context);
+
+        var annualContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual);
+        var weeklyContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Weekly);
+
+        await controller.CreateActivity(new CreateActivityDto
+        {
+            Title = "Annual Goal", Type = ActivityType.Task, ContainerId = annualContainer.Id
+        });
+        await controller.CreateActivity(new CreateActivityDto
+        {
+            Title = "Weekly Task", Type = ActivityType.Task, ContainerId = weeklyContainer.Id
+        });
+
+        // Act - filter by Weekly
+        var result = await controller.GetActivities(ContainerType.Weekly);
+
+        // Assert
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var activities = okResult.Value.Should().BeAssignableTo<List<ActivityResponseDto>>().Subject;
+
+        activities.Should().HaveCount(1);
+        activities[0].Title.Should().Be("Weekly Task");
+        activities[0].Containers[0].ContainerType.Should().Be(ContainerType.Weekly);
+    }
+
+    [Fact]
+    public async Task PUT_UpdateActivity_UpdatesTitleAndDescription()
+    {
+        // Arrange
+        var controller = CreateController();
+
+        var createResult = await controller.CreateActivity(new CreateActivityDto
+        {
+            Title = "Original Title", Type = ActivityType.Task,
+            Description = "Original description"
+        });
+        var created = ((createResult as CreatedAtActionResult)!.Value as ActivityResponseDto)!;
+
+        var updateDto = new UpdateActivityDto
+        {
+            Title = "Updated Title",
+            Description = "Updated description"
+        };
+
+        // Act
+        var result = await controller.UpdateActivity(created.Id, updateDto);
+
+        // Assert
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var updated = okResult.Value.Should().BeOfType<ActivityResponseDto>().Subject;
+
+        updated.Title.Should().Be("Updated Title");
+        updated.Description.Should().Be("Updated description");
+        updated.Type.Should().Be(ActivityType.Task); // Unchanged
+        updated.Containers.Should().HaveCount(1);    // Container association preserved
+    }
+
+    [Fact]
+    public async Task PUT_UpdateActivity_WithNonExistentId_ReturnsNotFound()
+    {
+        // Arrange
+        var controller = CreateController();
+        var updateDto = new UpdateActivityDto { Title = "New Title" };
+
+        // Act
+        var result = await controller.UpdateActivity(99999, updateDto);
+
+        // Assert
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task PUT_UpdateActivity_WithInvalidHierarchy_ReturnsBadRequest()
+    {
+        // Arrange
+        var controller = CreateController();
+
+        var projectResult = await controller.CreateActivity(new CreateActivityDto
+        {
+            Title = "My Project", Type = ActivityType.Project
+        });
+        var project = ((projectResult as CreatedAtActionResult)!.Value as ActivityResponseDto)!;
+
+        // Act - Project cannot have a parent
+        var result = await controller.UpdateActivity(project.Id, new UpdateActivityDto
+        {
+            ParentActivityId = project.Id // Self-reference as parent (also invalid)
+        });
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task PATCH_ToggleCompletion_MarksActivityAsComplete()
+    {
+        // Arrange
+        var controller = CreateController();
+        var containerService = new ContainerService(Context);
+        var annualContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual);
+
+        var createResult = await controller.CreateActivity(new CreateActivityDto
+        {
+            Title = "Task to Complete", Type = ActivityType.Task,
+            ContainerId = annualContainer.Id
+        });
+        var created = ((createResult as CreatedAtActionResult)!.Value as ActivityResponseDto)!;
+
+        // Act - Mark as complete
+        var result = await controller.ToggleCompletion(created.Id, new ToggleCompletionDto
+        {
+            ContainerId = annualContainer.Id,
+            IsCompleted = true
+        });
+
+        // Assert
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var activity = okResult.Value.Should().BeOfType<ActivityResponseDto>().Subject;
+        activity.Containers[0].CompletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task PATCH_ToggleCompletion_MarksActivityAsIncomplete()
+    {
+        // Arrange
+        var controller = CreateController();
+        var containerService = new ContainerService(Context);
+        var annualContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual);
+
+        var createResult = await controller.CreateActivity(new CreateActivityDto
+        {
+            Title = "Task to Uncomplete", Type = ActivityType.Task,
+            ContainerId = annualContainer.Id
+        });
+        var created = ((createResult as CreatedAtActionResult)!.Value as ActivityResponseDto)!;
+
+        // Mark as complete first
+        await controller.ToggleCompletion(created.Id, new ToggleCompletionDto
+        {
+            ContainerId = annualContainer.Id, IsCompleted = true
+        });
+
+        // Act - Mark as incomplete
+        var result = await controller.ToggleCompletion(created.Id, new ToggleCompletionDto
+        {
+            ContainerId = annualContainer.Id,
+            IsCompleted = false
+        });
+
+        // Assert
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var activity = okResult.Value.Should().BeOfType<ActivityResponseDto>().Subject;
+        activity.Containers[0].CompletedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PATCH_ToggleCompletion_ActivityNotInContainer_ReturnsBadRequest()
+    {
+        // Arrange
+        var controller = CreateController();
+        var containerService = new ContainerService(Context);
+        var annualContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual);
+        var weeklyContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Weekly);
+
+        var createResult = await controller.CreateActivity(new CreateActivityDto
+        {
+            Title = "Annual Only", Type = ActivityType.Task,
+            ContainerId = annualContainer.Id
+        });
+        var created = ((createResult as CreatedAtActionResult)!.Value as ActivityResponseDto)!;
+
+        // Act - Try to toggle in a container the activity doesn't belong to
+        var result = await controller.ToggleCompletion(created.Id, new ToggleCompletionDto
+        {
+            ContainerId = weeklyContainer.Id,
+            IsCompleted = true
+        });
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task DELETE_ArchiveActivity_ReturnsNoContentAndExcludesFromList()
+    {
+        // Arrange
+        var controller = CreateController();
+
+        var createResult = await controller.CreateActivity(new CreateActivityDto
+        {
+            Title = "To Be Deleted", Type = ActivityType.Task
+        });
+        var created = ((createResult as CreatedAtActionResult)!.Value as ActivityResponseDto)!;
+
+        // Act
+        var deleteResult = await controller.DeleteActivity(created.Id);
+
+        // Assert - returns 204
+        deleteResult.Should().BeOfType<NoContentResult>();
+
+        // Assert - activity no longer appears in list
+        var listResult = await controller.GetActivities();
+        var activities = ((listResult as OkObjectResult)!.Value as List<ActivityResponseDto>)!;
+        activities.Should().NotContain(a => a.Id == created.Id);
+
+        // Assert - individual lookup also returns 404
+        var getResult = await controller.GetActivity(created.Id);
+        getResult.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task DELETE_ArchiveActivity_WithNonExistentId_ReturnsNotFound()
+    {
+        // Arrange
+        var controller = CreateController();
+
+        // Act
+        var result = await controller.DeleteActivity(99999);
+
+        // Assert
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 }

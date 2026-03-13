@@ -36,177 +36,43 @@
 
 ## Implementation Phases
 
-### Phase 3.1: Database Models & Migration ✅ / ⏳ / ❌
-**Goal**: Create new EF Core models and migration
+### Phase 3.1: Database Models & Migration ✅ COMPLETE
+- `ActivityTemplate`, `Container`, `ContainerActivity` models created
+- Enums: `ContainerType`, `ContainerStatus`, `RecurrenceType`, `ActivityType`
+- `AppDbContext` configured with composite keys, indexes, cascade deletes
+- Migration `AddContainerArchitecture` applied
 
-**Files to Create/Modify**:
-- [ ] `src/backend/LifeSprint.Core/Models/ActivityTemplate.cs`
-  - Master task definition
-  - IsRecurring, RecurrenceType, ArchivedAt
-  - Navigation: ContainerActivities collection
+### Phase 3.2: Activity Service Layer ✅ COMPLETE
+- `IActivityService` with full CRUD + toggle + filter signatures
+- `CreateActivityDto`, `UpdateActivityDto`, `ActivityResponseDto` DTOs
+- `ActivityService` implementing all operations with hierarchy validation
 
-- [ ] `src/backend/LifeSprint.Core/Models/Container.cs`
-  - Type enum (Annual/Monthly/Weekly/Daily)
-  - Status enum (Active/Completed/Archived)
-  - StartDate, EndDate, navigation properties
+### Phase 3.3: Unit Tests ✅ COMPLETE
+- `ActivityServiceTests.cs`: 40+ unit tests covering create, read, update, archive, toggle, hierarchy
+- `ActivitiesControllerTests.cs`: 30+ controller unit tests covering all endpoints
+- **80 unit tests total, all passing**
 
-- [ ] `src/backend/LifeSprint.Core/Models/ContainerActivity.cs`
-  - Junction table with composite key
-  - CompletedAt, Order, IsRolledOver
-  - Navigation: ActivityTemplate, Container
+### Phase 3.4: Integration Tests ✅ COMPLETE
+- `ActivityServiceIntegrationTests.cs`: create, update, archive, toggle, filter scenarios
+- `ActivitiesControllerIntegrationTests.cs`: full request/response coverage
+- xUnit `[Collection("IntegrationTests")]` prevents parallel execution conflicts
+- **33 integration tests total, all passing**
 
-- [ ] `src/backend/LifeSprint.Core/Enums/ContainerType.cs`
-  - Annual, Monthly, Weekly, Daily
+### Phase 3.5: Container Helper Service ✅ COMPLETE
+- `IContainerService` / `ContainerService` with `GetOrCreateCurrentContainerAsync`
+- Correct date ranges for Annual, Monthly (fixed off-by-one bug), Weekly (ISO 8601), Daily
+- `ContainerServiceTests.cs`: unit tests for all container types
 
-- [ ] `src/backend/LifeSprint.Core/Enums/ContainerStatus.cs`
-  - Active, Completed, Archived
+### Phase 3.6: API Controller ✅ COMPLETE
+- `ActivitiesController`: GET (with filter), POST, PUT, PATCH /complete, DELETE
+- `ContainersController`: GET /current
+- Services registered in `Program.cs`
 
-- [ ] `src/backend/LifeSprint.Core/Enums/RecurrenceType.cs`
-  - Annual, Monthly, Weekly, Daily, None
-
-- [ ] `src/backend/LifeSprint.Infrastructure/Data/AppDbContext.cs`
-  - Configure new entities
-  - Set up composite keys for ContainerActivity
-  - Add indexes for common queries
-  - Create migration: `AddContainerArchitecture`
-
-**Success Criteria**: Migration runs successfully, database schema created
-
----
-
-### Phase 3.2: Activity Service Layer ✅ / ⏳ / ❌
-**Goal**: Create service to handle Activity creation with container relationships
-
-**Files to Create**:
-- [ ] `src/backend/LifeSprint.Core/Interfaces/IActivityService.cs`
-  - CreateActivityAsync(userId, createDto)
-  - GetActivitiesForUserAsync(userId) - basic read for tests
-  - Comments: Link to ActivityService implementation
-
-- [ ] `src/backend/LifeSprint.Core/DTOs/CreateActivityDto.cs`
-  - Title, Description, IsRecurring, RecurrenceType
-  - ContainerId (optional - defaults to current Annual backlog)
-  - Small, focused DTO with validation attributes
-
-- [ ] `src/backend/LifeSprint.Core/DTOs/ActivityResponseDto.cs`
-  - Return DTO with template info + container associations
-  - Includes completion status per container
-
-- [ ] `src/backend/LifeSprint.Infrastructure/Services/ActivityService.cs`
-  - Implements IActivityService
-  - **CreateActivityAsync logic**:
-    1. Create ActivityTemplate record
-    2. If ContainerId provided, add to ContainerActivities
-    3. If no container, find or create current Annual container
-    4. Return ActivityResponseDto
-  - **GetActivitiesForUserAsync** (basic implementation):
-    - Pull all ActivityTemplates for user with container associations
-    - Transform to DTOs
-  - Comments: Link to related files (DTOs, models, tests)
-
-**Success Criteria**: Service compiles, basic logic in place
-
----
-
-### Phase 3.3: Unit Tests ✅ / ⏳ / ❌
-**Goal**: TDD-style unit tests for ActivityService
-
-**Files to Create**:
-- [ ] `src/backend/LifeSprint.Tests/Unit/ActivityServiceTests.cs`
-  - Test: CreateActivity_WithoutContainer_AddsToAnnualBacklog
-  - Test: CreateActivity_WithContainer_AddsToSpecifiedContainer
-  - Test: CreateRecurringActivity_SetsRecurrenceCorrectly
-  - Test: GetActivitiesForUser_ReturnsAllUserActivities
-  - Test: GetActivitiesForUser_DoesNotReturnOtherUsersActivities
-  - Mock dependencies (DbContext via InMemory)
-  - Comments: Explain test scenarios and expected behavior
-
-**Success Criteria**: All unit tests pass
-
----
-
-### Phase 3.4: Integration Tests ✅ / ⏳ / ❌
-**Goal**: Test actual database operations with Docker test DB
-
-**Files to Create**:
-- [ ] `src/backend/LifeSprint.Tests/Integration/ActivityServiceIntegrationTests.cs`
-  - Test: CreateActivity_PersistsToDatabase
-  - Test: CreateActivity_InAnnualContainer_CreatesCorrectAssociations
-  - Test: CreateActivity_InMonthlyContainer_CreatesCorrectAssociations
-  - Test: CreateActivity_InWeeklyContainer_CreatesCorrectAssociations
-  - Test: CreateRecurringActivity_CanBeQueriedByType
-  - Uses real database connection (test-db from docker-compose)
-  - Setup/teardown with IAsyncLifetime
-  - Comments: Explain integration test setup
-
-**Success Criteria**: All integration tests pass against test database
-
----
-
-### Phase 3.5: Container Helper Service ✅ / ⏳ / ❌
-**Goal**: Service to manage containers (find current, create new)
-
-**Files to Create**:
-- [ ] `src/backend/LifeSprint.Core/Interfaces/IContainerService.cs`
-  - GetOrCreateCurrentContainerAsync(userId, containerType)
-  - GetContainerAsync(containerId)
-  - Comments: Link to ContainerService
-
-- [ ] `src/backend/LifeSprint.Infrastructure/Services/ContainerService.cs`
-  - **GetOrCreateCurrentContainerAsync** logic:
-    1. Find active container of type for user
-    2. If not found, create new one with appropriate dates
-    3. Return container
-  - Date logic for each container type:
-    - Annual: Jan 1 - Dec 31 of current year
-    - Monthly: 1st - last day of current month
-    - Weekly: Monday - Sunday of current week
-    - Daily: Today's date
-  - Comments: Explain date calculations and container lifecycle
-
-- [ ] `src/backend/LifeSprint.Tests/Unit/ContainerServiceTests.cs`
-  - Test: GetOrCreateAnnualContainer_CreatesIfNotExists
-  - Test: GetOrCreateAnnualContainer_ReturnsExistingIfActive
-  - Test: GetOrCreateMonthlyContainer_UsesCorrectDateRange
-  - Test: GetOrCreateWeeklyContainer_UsesCorrectDateRange
-
-**Success Criteria**: Container management working, tests pass
-
----
-
-### Phase 3.6: API Controller ✅ / ⏳ / ❌
-**Goal**: Expose Activity creation via REST API
-
-**Files to Create**:
-- [ ] `src/backend/LifeSprint.Api/Controllers/ActivitiesController.cs`
-  - POST /api/activities - Create activity
-  - GET /api/activities - Get all activities for current user
-  - Depends on IActivityService
-  - Authorization: Requires authenticated user
-  - Comments: Link to service layer and DTOs
-
-- [ ] Register services in `src/backend/LifeSprint.Api/Program.cs`
-  - AddScoped<IActivityService, ActivityService>
-  - AddScoped<IContainerService, ContainerService>
-
-**Success Criteria**:
-- Can create activity via API
-- Can retrieve activities via API
-- Returns 401 if not authenticated
-
----
-
-### Phase 3.7: Manual Testing ✅ / ⏳ / ❌
-**Goal**: Verify end-to-end functionality with curl/Postman
-
-**Test Scenarios**:
-- [ ] Create activity without container (should go to Annual)
-- [ ] Create activity with specific container
-- [ ] Create recurring activity
-- [ ] Retrieve all activities for user
-- [ ] Verify user isolation (can't see other users' activities)
-
-**Success Criteria**: All scenarios work as expected
+### Phase 3.7: Frontend ✅ COMPLETE
+- `BacklogTabs`, `ActivityList`, `ActivityEditor` components
+- `activityService` API client for all CRUD + toggle
+- Tab switching triggers server-side filtered reload
+- **41 Vitest unit tests, all passing**
 
 ---
 
@@ -279,28 +145,18 @@
 
 ## Progress Tracking
 
-### Current Status: Planning Complete ✅
+### Current Status: Phase 3 Complete ✅
 
-**Next Step**: Phase 3.1 - Database Models & Migration
+**Completed**: 2026-03-13
 
-**Estimated Effort**:
-- Phase 3.1: 30 minutes (models + migration)
-- Phase 3.2: 45 minutes (service layer)
-- Phase 3.3: 30 minutes (unit tests)
-- Phase 3.4: 30 minutes (integration tests)
-- Phase 3.5: 30 minutes (container service)
-- Phase 3.6: 20 minutes (API controller)
-- Phase 3.7: 15 minutes (manual testing)
+**Test Counts**:
+- Backend unit tests: 80 (all passing)
+- Backend integration tests: 33 (all passing)
+- Frontend Vitest tests: 41 (all passing)
 
-**Total**: ~3.5 hours
+## Bugs Fixed During Implementation
 
----
-
-## Notes
-
-- Keep files small (<200 lines ideally)
-- Write tests first (TDD) where possible
-- Add detailed comments for AI navigation
-- Link related files in comments
-- Focus on CREATE only - Read/Update/Delete later
-- Basic read functionality just to support tests
+1. **`ContainerService.GetMonthlyRange`**: `AddDays(-1).AddMonths(1)` → `AddMonths(1).AddDays(-1)` (wrong end date)
+2. **`ActivityService.ValidateHierarchy`**: `Project` type was missing from dictionary, allowing Projects to silently gain parents
+3. **`ActivityService.GetActivityByIdAsync`**: Missing `&& at.ArchivedAt == null` filter caused archived activities to return 200
+4. **Integration test parallelism**: xUnit runs test classes in parallel by default; shared `TestUserId` caused `CleanupTestDataAsync` to delete live test data; fixed with `[Collection("IntegrationTests")]`

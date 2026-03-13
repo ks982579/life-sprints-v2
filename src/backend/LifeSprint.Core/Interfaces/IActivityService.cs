@@ -1,4 +1,5 @@
 using LifeSprint.Core.DTOs;
+using LifeSprint.Core;
 
 namespace LifeSprint.Core.Interfaces;
 
@@ -24,12 +25,13 @@ public interface IActivityService
     Task<ActivityResponseDto> CreateActivityAsync(string userId, CreateActivityDto dto);
 
     /// <summary>
-    /// Gets all activities for a user (basic implementation for testing).
+    /// Gets all activities for a user, optionally filtered by container type.
     /// Returns all non-archived activities with their container associations.
     /// </summary>
     /// <param name="userId">User ID to filter by</param>
-    /// <returns>List of activities</returns>
-    Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId);
+    /// <param name="containerType">Optional container type filter (Annual/Monthly/Weekly/Daily)</param>
+    /// <returns>List of activities belonging to at least one container of the specified type</returns>
+    Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null);
 
     /// <summary>
     /// Gets a single activity by ID.

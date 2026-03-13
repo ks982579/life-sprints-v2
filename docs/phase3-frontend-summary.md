@@ -83,11 +83,16 @@ This pattern:
 ## Integration with Backend
 
 The frontend connects to the backend API endpoints:
-- `GET /api/activities` - Fetch all user activities
-- `GET /api/activities/:id` - Fetch single activity
+- `GET /api/activities?containerType={n}` - Fetch activities filtered by container type
+- `GET /api/activities/{id}` - Fetch single activity
 - `POST /api/activities` - Create new activity
+- `PUT /api/activities/{id}` - Update activity
+- `PATCH /api/activities/{id}/complete` - Toggle completion in a container
+- `DELETE /api/activities/{id}` - Archive activity
 
 All API calls use the existing authentication system with cookie-based sessions.
+
+Tab switching triggers a server-side filtered reload (`activityService.getActivities(containerType)`), not client-side filtering.
 
 ## User Experience Flow
 
@@ -106,20 +111,27 @@ All API calls use the existing authentication system with cookie-based sessions.
    - Error messages for failed operations
    - Immediate UI updates after creating activities
 
+## Test Coverage
+
+41 Vitest unit tests across 4 files:
+- `BacklogTabs.test.tsx` (5 tests): tab rendering, active class, click handlers
+- `ActivityList.test.tsx` (13 tests): filtering, badges, completion checkbox, sorting, delete button
+- `ActivityEditor.test.tsx` (13 tests): create/edit modes, validation, recurrence, parent dropdown, form reset
+- `activityService.test.ts` (8 tests): all API methods with mock `api` module
+
 ## Build Status
 ✅ TypeScript compilation successful
 ✅ Vite build successful
 ✅ All components integrated
 ✅ Type safety enforced
 ✅ No linting errors
+✅ 41 unit tests passing
 
-## Next Steps (Future Enhancements)
-- Activity completion functionality
-- Edit existing activities
-- Delete/archive activities
+## Next Steps (Phase 4)
+- React Router setup and dedicated routes per backlog
+- Activity detail modal with full child hierarchy
 - Drag-and-drop reordering
 - Move activities between containers
 - Date pickers for container navigation (view historical data)
-- Activity detail modal with full child hierarchy
 - Bulk operations
 - Search and filtering

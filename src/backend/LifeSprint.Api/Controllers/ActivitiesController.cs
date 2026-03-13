@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using LifeSprint.Core.Interfaces;
 using LifeSprint.Core.DTOs;
+using LifeSprint.Core;
 using System.Security.Claims;
 
 namespace LifeSprint.Api.Controllers;
@@ -68,16 +69,17 @@ public class ActivitiesController : ControllerBase
     /// <summary>
     /// Gets all non-archived activities for the current user.
     /// </summary>
+    /// <param name="containerType">Optional filter: 0=Annual, 1=Monthly, 2=Weekly, 3=Daily</param>
     /// <returns>List of user's activities</returns>
     /// <response code="200">Activities retrieved successfully</response>
     /// <response code="500">Internal server error</response>
     [HttpGet]
-    public async Task<IActionResult> GetActivities()
+    public async Task<IActionResult> GetActivities([FromQuery] ContainerType? containerType = null)
     {
         try
         {
             var userId = GetCurrentUserId();
-            var activities = await _activityService.GetActivitiesForUserAsync(userId);
+            var activities = await _activityService.GetActivitiesForUserAsync(userId, containerType);
 
             return Ok(activities);
         }

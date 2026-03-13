@@ -18,16 +18,16 @@ function Dashboard() {
   const [showContainerSelector, setShowContainerSelector] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState<Container | undefined>();
 
-  // Load activities on mount
+  // Reload activities whenever the active tab changes (server-side filter by container type)
   useEffect(() => {
-    loadActivities();
-  }, []);
+    loadActivities(activeTab);
+  }, [activeTab]);
 
-  const loadActivities = async () => {
+  const loadActivities = async (containerType?: ContainerType) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await activityService.getActivities();
+      const data = await activityService.getActivities(containerType ?? activeTab);
       setActivities(data);
     } catch (err) {
       setError('Failed to load activities. Please try again.');
@@ -54,7 +54,7 @@ function Dashboard() {
         // Create new activity
         await activityService.createActivity(activityData);
       }
-      await loadActivities();
+      await loadActivities(activeTab);
       setShowEditor(false);
       setEditingActivity(undefined);
     } catch (err) {
@@ -77,7 +77,7 @@ function Dashboard() {
     try {
       setError(null);
       await activityService.deleteActivity(activityId);
-      await loadActivities();
+      await loadActivities(activeTab);
     } catch (err) {
       setError('Failed to delete activity. Please try again.');
       console.error('Error deleting activity:', err);
@@ -88,7 +88,7 @@ function Dashboard() {
     try {
       setError(null);
       await activityService.toggleCompletion(activityId, containerId, isCompleted);
-      await loadActivities();
+      await loadActivities(activeTab);
     } catch (err) {
       setError('Failed to toggle completion status. Please try again.');
       console.error('Error toggling completion:', err);

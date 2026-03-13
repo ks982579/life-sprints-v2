@@ -208,12 +208,17 @@ public class ActivityServiceTests
 - Implements `IAsyncLifetime` for setup/teardown
 - Cleans test data using raw SQL (avoids FK constraint issues)
 
+**CRITICAL**: All integration test classes that share `TestUserId` MUST use the xUnit `[Collection]` attribute to prevent parallel execution from corrupting test data:
+
 ```csharp
+[Collection("IntegrationTests")]
 public class ActivityServiceIntegrationTests : IntegrationTestBase
 {
     // Tests full stack: Service -> EF Core -> PostgreSQL
 }
 ```
+
+The collection is defined in `Integration/IntegrationTestCollection.cs` with `DisableParallelization = true`. Without this, concurrent `CleanupTestDataAsync` calls delete each other's live test data.
 
 ## Docker Development Workflow
 
@@ -275,6 +280,12 @@ await Context.Database.ExecuteSqlRawAsync(@"
 ```typescript
 import { ActivityType, type Activity } from './types';
 ```
+
+6. **`ValidateHierarchy` covers all four types**: `Project` is included in the valid-relationships dictionary with an empty allowed-parents list. Any activity of type `Project` that has a `ParentActivityId` set will throw `InvalidOperationException`. Do not remove `Project` from the dictionary.
+
+7. **`GetActivityByIdAsync` filters archived activities**: The query includes `&& at.ArchivedAt == null`. This means a soft-deleted activity returns `null` (→ 404) from `GET /activities/{id}`, consistent with `GetActivitiesForUserAsync`.
+
+8. **Docker runs backend as non-root**: `docker-compose.yml` uses `user: "${UID:-1000}:${GID:-1000}"` with dedicated volumes for NuGet packages and the dotnet home directory. Do not remove these — running as root creates root-owned `obj/`/`bin/` in the bind-mounted source tree.
 
 ## Migration Notes
 

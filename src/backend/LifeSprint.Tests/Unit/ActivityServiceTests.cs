@@ -128,10 +128,6 @@ public class ActivityServiceTests : IDisposable
         await _context.Containers.AddAsync(weeklyContainer);
         await _context.SaveChangesAsync();
 
-        _mockContainerService
-            .Setup(x => x.GetContainerAsync(TestUserId, 5))
-            .ReturnsAsync(weeklyContainer);
-
         var dto = new CreateActivityDto
         {
             Title = "Write unit tests", Type = ActivityType.Task,
@@ -150,10 +146,7 @@ public class ActivityServiceTests : IDisposable
         result.Containers[0].ContainerId.Should().Be(5);
         result.Containers[0].ContainerType.Should().Be(ContainerType.Weekly);
 
-        // Verify container service was called correctly
-        _mockContainerService.Verify(
-            x => x.GetContainerAsync(TestUserId, 5),
-            Times.Once);
+        // Verify container service was NOT used (service queries DB directly for specific container)
         _mockContainerService.Verify(
             x => x.GetOrCreateCurrentContainerAsync(It.IsAny<string>(), It.IsAny<ContainerType>()),
             Times.Never);
@@ -162,11 +155,7 @@ public class ActivityServiceTests : IDisposable
     [Fact]
     public async Task CreateActivityAsync_WithInvalidContainerId_ThrowsUnauthorizedAccessException()
     {
-        // Arrange
-        _mockContainerService
-            .Setup(x => x.GetContainerAsync(TestUserId, 999))
-            .ReturnsAsync((Container?)null); // Container not found or unauthorized
-
+        // Arrange - container 999 simply doesn't exist in the DB, service queries DB directly
         var dto = new CreateActivityDto
         {
             Title = "Test activity", Type = ActivityType.Task,

@@ -24,6 +24,9 @@ services:
     image: mcr.microsoft.com/dotnet/sdk:10.0
     container_name: lifesprint-backend
     working_dir: /src
+    # Run as the host user so bind-mounted files (obj/bin) are owned by the host user, not root.
+    # Set DOTNET_CLI_HOME to a dedicated volume so dotnet tools/config have a writable home.
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=${POSTGRES_DB:-lifesprint};Username=${POSTGRES_USER:-lifesprint};Password=${POSTGRES_PASSWORD:-dev_password}
@@ -32,6 +35,8 @@ services:
       - GitHub__CallbackUrl=${GITHUB_CALLBACK_URL:-http://localhost/api/auth/github/callback}
       - CorsOrigins=http://localhost:3000,http://localhost
       - ASPNETCORE_URLS=http://+:5000
+      - DOTNET_CLI_HOME=/dotnet-home
+      - NUGET_PACKAGES=/nuget/packages
     ports:
       - "5000:5000"
     depends_on:
@@ -39,12 +44,13 @@ services:
         condition: service_healthy
     volumes:
       - ./src/backend:/src
-      - backend_nuget:/root/.nuget/packages
+      - backend_nuget:/nuget/packages
+      - backend_dotnet_home:/dotnet-home
     command: >
       sh -c "
         echo 'Installing dotnet-ef tool...' &&
         dotnet tool install --global dotnet-ef --version 10.* 2>/dev/null || echo 'dotnet-ef already installed' &&
-        export PATH=\"$PATH:/root/.dotnet/tools\" &&
+        export PATH=\"$PATH:/dotnet-home/.dotnet/tools\" &&
         echo 'Restoring NuGet packages...' &&
         dotnet restore LifeSprint.Api/LifeSprint.Api.csproj &&
         echo 'Building projects...' &&
@@ -113,6 +119,7 @@ services:
 volumes:
   postgres_data:
   backend_nuget:
+  backend_dotnet_home:
   frontend_node_modules:
 
 networks:

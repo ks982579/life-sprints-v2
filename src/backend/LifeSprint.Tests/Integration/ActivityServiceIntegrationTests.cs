@@ -17,6 +17,7 @@ namespace LifeSprint.Tests.Integration;
 /// - Base: Integration/IntegrationTestBase.cs
 /// - docker-compose.yml: test-db service configuration
 /// </remarks>
+[Collection("IntegrationTests")]
 public class ActivityServiceIntegrationTests : IntegrationTestBase
 {
     [Fact]
@@ -287,5 +288,243 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
         saved.Should().NotBeNull();
         saved!.IsRecurring.Should().BeTrue();
         saved.RecurrenceType.Should().Be(RecurrenceType.Daily);
+    }
+
+    [Fact]
+    public async Task UpdateActivity_ChangesFieldsAndPersists()
+    {
+        // Arrange
+        var containerService = new ContainerService(Context);
+        var activityService = new ActivityService(Context, containerService);
+
+        var created = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Original Title", Type = ActivityType.Task,
+            Description = "Original description"
+        });
+
+        var updateDto = new UpdateActivityDto
+        {
+            Title = "Updated Title",
+            Description = "Updated description"
+        };
+
+        // Act
+        var result = await activityService.UpdateActivityAsync(TestUserId, created.Id, updateDto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Title.Should().Be("Updated Title");
+        result.Description.Should().Be("Updated description");
+        result.Type.Should().Be(ActivityType.Task); // Unchanged
+
+        // Verify persistence in database
+        var saved = await Context.ActivityTemplates.FindAsync(created.Id);
+        saved!.Title.Should().Be("Updated Title");
+        saved.Description.Should().Be("Updated description");
+    }
+
+    [Fact]
+    public async Task UpdateActivity_WithInvalidHierarchy_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var containerService = new ContainerService(Context);
+        var activityService = new ActivityService(Context, containerService);
+
+        var project1 = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Project One", Type = ActivityType.Project
+        });
+        var project2 = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Project Two", Type = ActivityType.Project
+        });
+
+        // Act & Assert - A Project cannot have a parent (even another Project)
+        var updateDto = new UpdateActivityDto { ParentActivityId = project2.Id };
+        var act = async () => await activityService.UpdateActivityAsync(TestUserId, project1.Id, updateDto);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Project*");
+    }
+
+    [Fact]
+    public async Task UpdateActivity_OtherUsersActivity_ReturnsNull()
+    {
+        // Arrange
+        var containerService = new ContainerService(Context);
+        var activityService = new ActivityService(Context, containerService);
+
+        var created = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "My Activity", Type = ActivityType.Task
+        });
+
+        // Act - Try to update as a different user
+        var result = await activityService.UpdateActivityAsync("other_user", created.Id, new UpdateActivityDto
+        {
+            Title = "Hijacked Title"
+        });
+
+        // Assert
+        result.Should().BeNull();
+
+        // Verify the title was NOT changed
+        var unchanged = await Context.ActivityTemplates.FindAsync(created.Id);
+        unchanged!.Title.Should().Be("My Activity");
+    }
+
+    [Fact]
+    public async Task ArchiveActivity_SetsArchivedAtAndExcludesFromQueries()
+    {
+        // Arrange
+        var containerService = new ContainerService(Context);
+        var activityService = new ActivityService(Context, containerService);
+
+        var created = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "To Be Archived", Type = ActivityType.Task
+        });
+
+        // Act
+        var success = await activityService.ArchiveActivityAsync(TestUserId, created.Id);
+
+        // Assert - archive returned true
+        success.Should().BeTrue();
+
+        // Verify ArchivedAt is set in database
+        var saved = await Context.ActivityTemplates.FindAsync(created.Id);
+        saved!.ArchivedAt.Should().NotBeNull();
+        saved.ArchivedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+
+        // Verify excluded from user query
+        var activities = await activityService.GetActivitiesForUserAsync(TestUserId);
+        activities.Should().NotContain(a => a.Id == created.Id);
+    }
+
+    [Fact]
+    public async Task ArchiveActivity_OtherUsersActivity_ReturnsFalse()
+    {
+        // Arrange
+        var containerService = new ContainerService(Context);
+        var activityService = new ActivityService(Context, containerService);
+
+        var created = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "My Activity", Type = ActivityType.Task
+        });
+
+        // Act - Try to archive as a different user
+        var success = await activityService.ArchiveActivityAsync("other_user", created.Id);
+
+        // Assert
+        success.Should().BeFalse();
+
+        // Verify NOT archived
+        var saved = await Context.ActivityTemplates.FindAsync(created.Id);
+        saved!.ArchivedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ToggleActivityCompletion_MarksAsCompleteAndIncomplete()
+    {
+        // Arrange
+        var containerService = new ContainerService(Context);
+        var activityService = new ActivityService(Context, containerService);
+
+        var annualContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual);
+        var created = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Task to Complete", Type = ActivityType.Task,
+            ContainerId = annualContainer.Id
+        });
+
+        // Act - Mark as complete
+        var completed = await activityService.ToggleActivityCompletionAsync(
+            TestUserId, created.Id, annualContainer.Id, isCompleted: true);
+
+        // Assert - completed
+        completed.Should().NotBeNull();
+        completed!.Containers[0].CompletedAt.Should().NotBeNull();
+
+        // Verify in database
+        var ca = await Context.ContainerActivities
+            .FindAsync(annualContainer.Id, created.Id);
+        ca!.CompletedAt.Should().NotBeNull();
+
+        // Act - Mark as incomplete
+        var incomplete = await activityService.ToggleActivityCompletionAsync(
+            TestUserId, created.Id, annualContainer.Id, isCompleted: false);
+
+        // Assert - back to incomplete
+        incomplete!.Containers[0].CompletedAt.Should().BeNull();
+
+        var caAfter = await Context.ContainerActivities
+            .FindAsync(annualContainer.Id, created.Id);
+        caAfter!.CompletedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ToggleActivityCompletion_ActivityNotInContainer_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var containerService = new ContainerService(Context);
+        var activityService = new ActivityService(Context, containerService);
+
+        var annualContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual);
+        var weeklyContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Weekly);
+
+        // Create activity in annual only
+        var created = await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Annual Only Task", Type = ActivityType.Task,
+            ContainerId = annualContainer.Id
+        });
+
+        // Act & Assert - trying to toggle in a container it doesn't belong to
+        var act = async () => await activityService.ToggleActivityCompletionAsync(
+            TestUserId, created.Id, weeklyContainer.Id, isCompleted: true);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"Activity {created.Id} is not associated with container {weeklyContainer.Id}");
+    }
+
+    [Fact]
+    public async Task GetActivitiesForUser_WithContainerTypeFilter_ReturnsOnlyMatchingActivities()
+    {
+        // Arrange
+        var containerService = new ContainerService(Context);
+        var activityService = new ActivityService(Context, containerService);
+
+        var annualContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Annual);
+        var weeklyContainer = await containerService.GetOrCreateCurrentContainerAsync(TestUserId, ContainerType.Weekly);
+
+        await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Annual Goal", Type = ActivityType.Task, ContainerId = annualContainer.Id
+        });
+        await activityService.CreateActivityAsync(TestUserId, new CreateActivityDto
+        {
+            Title = "Weekly Task", Type = ActivityType.Task, ContainerId = weeklyContainer.Id
+        });
+
+        // Act - filter by Weekly
+        var weeklyActivities = await activityService.GetActivitiesForUserAsync(TestUserId, ContainerType.Weekly);
+
+        // Assert - only weekly activity returned
+        weeklyActivities.Should().HaveCount(1);
+        weeklyActivities[0].Title.Should().Be("Weekly Task");
+
+        // Act - filter by Annual
+        var annualActivities = await activityService.GetActivitiesForUserAsync(TestUserId, ContainerType.Annual);
+
+        // Assert - only annual activity returned
+        annualActivities.Should().HaveCount(1);
+        annualActivities[0].Title.Should().Be("Annual Goal");
+
+        // Act - no filter
+        var allActivities = await activityService.GetActivitiesForUserAsync(TestUserId);
+
+        // Assert - both activities returned
+        allActivities.Should().HaveCount(2);
     }
 }
