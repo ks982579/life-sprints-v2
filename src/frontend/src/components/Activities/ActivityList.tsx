@@ -5,6 +5,8 @@ interface ActivityListProps {
   activities: Activity[];
   containerType: ContainerType;
   onActivityClick?: (activity: Activity) => void;
+  onEditActivity?: (activity: Activity) => void;
+  onMoveActivity?: (activity: Activity) => void;
   onActivityDelete?: (activityId: number) => void;
   onToggleCompletion?: (activityId: number, containerId: number, isCompleted: boolean) => void;
 }
@@ -23,12 +25,22 @@ const activityTypeColors: Record<number, string> = {
   [ActivityType.Task]: '#4caf50',
 };
 
-export function ActivityList({ activities, containerType, onActivityClick, onActivityDelete, onToggleCompletion }: ActivityListProps) {
+export function ActivityList({ activities, containerType, onActivityClick, onEditActivity, onMoveActivity, onActivityDelete, onToggleCompletion }: ActivityListProps) {
   const handleDelete = (e: React.MouseEvent, activityId: number) => {
     e.stopPropagation(); // Prevent triggering onClick
     if (window.confirm('Are you sure you want to delete this activity? This cannot be undone.')) {
       onActivityDelete?.(activityId);
     }
+  };
+
+  const handleEdit = (e: React.MouseEvent, activity: Activity) => {
+    e.stopPropagation();
+    onEditActivity?.(activity);
+  };
+
+  const handleMove = (e: React.MouseEvent, activity: Activity) => {
+    e.stopPropagation();
+    onMoveActivity?.(activity);
   };
 
   const handleToggleCompletion = (e: React.ChangeEvent<HTMLInputElement>, activity: Activity) => {
@@ -115,15 +127,35 @@ export function ActivityList({ activities, containerType, onActivityClick, onAct
             </div>
           )}
 
-            {onActivityDelete && (
-              <button
-                className="delete-button"
-                onClick={(e) => handleDelete(e, activity.id)}
-                title="Delete activity"
-              >
-                Delete
-              </button>
-            )}
+            <div className="activity-actions">
+              {onEditActivity && (
+                <button
+                  className="edit-button"
+                  onClick={(e) => handleEdit(e, activity)}
+                  title="Edit activity"
+                >
+                  Edit
+                </button>
+              )}
+              {onMoveActivity && (
+                <button
+                  className="move-button"
+                  onClick={(e) => handleMove(e, activity)}
+                  title="Add to another backlog"
+                >
+                  Move
+                </button>
+              )}
+              {onActivityDelete && (
+                <button
+                  className="delete-button"
+                  onClick={(e) => handleDelete(e, activity.id)}
+                  title="Delete activity"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
           </div>
         );
       })}

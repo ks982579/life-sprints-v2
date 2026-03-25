@@ -1,0 +1,50 @@
+.page {
+  max-width: 900px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #212529;
+  margin: 0;
+}
+
+.newButton {
+  background: #1a56db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.newButton:hover {
+  background: #1442a8;
+}
+
+.error {
+  background: #fff3f3;
+  border: 1px solid #f8d7da;
+  color: #842029;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.loading {
+  color: #6c757d;
+  font-size: 0.9rem;
+  padding: 2rem 0;
+  text-align: center;
+}

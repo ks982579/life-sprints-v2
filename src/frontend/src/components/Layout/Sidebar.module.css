@@ -1,0 +1,47 @@
+.sidebar {
+  width: 220px;
+  min-height: 100%;
+  background: #f8f9fa;
+  border-right: 1px solid #e9ecef;
+  padding: 1rem 0;
+  flex-shrink: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0.5rem;
+}
+
+.sectionLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6c757d;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.navLink {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  color: #495057;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.15s, color 0.15s;
+  margin-bottom: 2px;
+}
+
+.navLink:hover {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+.navLink.active {
+  background-color: #e8f0fe;
+  color: #1a56db;
+  font-weight: 600;
+}

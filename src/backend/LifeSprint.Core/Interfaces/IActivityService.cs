@@ -25,13 +25,15 @@ public interface IActivityService
     Task<ActivityResponseDto> CreateActivityAsync(string userId, CreateActivityDto dto);
 
     /// <summary>
-    /// Gets all activities for a user, optionally filtered by container type.
+    /// Gets all activities for a user, optionally filtered by container type or specific container ID.
+    /// When <paramref name="containerId"/> is provided it takes precedence over <paramref name="containerType"/>.
     /// Returns all non-archived activities with their container associations.
     /// </summary>
     /// <param name="userId">User ID to filter by</param>
     /// <param name="containerType">Optional container type filter (Annual/Monthly/Weekly/Daily)</param>
-    /// <returns>List of activities belonging to at least one container of the specified type</returns>
-    Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null);
+    /// <param name="containerId">Optional specific container ID filter; overrides containerType when set</param>
+    /// <returns>List of activities belonging to at least one matching container</returns>
+    Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null, int? containerId = null);
 
     /// <summary>
     /// Gets a single activity by ID.
@@ -71,4 +73,24 @@ public interface IActivityService
     /// <param name="isCompleted">True to mark as completed, false to mark as incomplete</param>
     /// <returns>Updated activity or null if not found/unauthorized</returns>
     Task<ActivityResponseDto?> ToggleActivityCompletionAsync(string userId, int activityId, int containerId, bool isCompleted);
+
+    /// <summary>
+    /// Adds an activity to an additional container (enables move/copy across backlogs).
+    /// Returns false if the association already exists or the activity/container is not found.
+    /// </summary>
+    /// <param name="userId">User ID (for authorization)</param>
+    /// <param name="activityId">Activity template ID</param>
+    /// <param name="containerId">Target container ID</param>
+    /// <returns>True on success, false if not found/unauthorized, null if already in container (conflict)</returns>
+    Task<bool?> AddActivityToContainerAsync(string userId, int activityId, int containerId);
+
+    /// <summary>
+    /// Removes an activity from a specific container (does not archive the activity template).
+    /// Returns false if the association is not found or user is unauthorized.
+    /// </summary>
+    /// <param name="userId">User ID (for authorization)</param>
+    /// <param name="activityId">Activity template ID</param>
+    /// <param name="containerId">Container ID to remove activity from</param>
+    /// <returns>True if removed, false if not found/unauthorized</returns>
+    Task<bool> RemoveActivityFromContainerAsync(string userId, int activityId, int containerId);
 }

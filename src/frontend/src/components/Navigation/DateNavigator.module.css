@@ -1,0 +1,65 @@
+.navigator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.arrowButton {
+  background: none;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+  padding: 0;
+}
+
+.arrowButton:hover:not(:disabled) {
+  background: #e9ecef;
+}
+
+.arrowButton:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.labelWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 160px;
+  gap: 2px;
+}
+
+.label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+.currentButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.72rem;
+  color: #1a56db;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.currentButton:hover {
+  color: #1442a8;
+}

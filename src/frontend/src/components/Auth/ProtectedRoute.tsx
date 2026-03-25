@@ -1,12 +1,16 @@
-import { type ReactNode } from 'react';
+import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { LoginPage } from './LoginPage';
 
-interface ProtectedRouteProps {
-  children: ReactNode;
-}
-
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+/**
+ * Route-level auth guard. Used as a layout route element in the router.
+ * Renders <Outlet /> (child routes) when authenticated, <LoginPage /> otherwise.
+ *
+ * Related files:
+ * - Router: src/frontend/src/router/index.tsx
+ * - AuthContext: src/frontend/src/context/AuthContext.tsx
+ */
+export const ProtectedRoute = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -15,7 +19,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: '100vh'
+        minHeight: '100vh',
       }}>
         <div>Loading...</div>
       </div>
@@ -26,5 +30,5 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <LoginPage />;
   }
 
-  return <>{children}</>;
+  return <Outlet />;
 };

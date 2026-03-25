@@ -7,13 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Next Up - Phase 4: Backlog Views & Navigation
-- React Router setup and dedicated route per backlog
-- Activity detail modal / inline editing workflow
-- Move activities between containers
-- Date navigation (view historical sprints)
-- MainLayout with sidebar navigation
-
 ---
 
 ## Roadmap / TODO
@@ -55,14 +48,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [x] Frontend Vitest unit tests (41 tests)
 - [x] **Tag: v0.2.0 - Core Activity CRUD Complete**
 
-### Phase 4: Backlog Views & Navigation
-- [ ] Frontend routing setup (React Router)
-- [ ] AnnualBacklog, MonthlyBacklog, WeeklySprint dedicated views
-- [ ] DailyChecklist component (optional)
-- [ ] MainLayout with sidebar and navigation
-- [ ] Header with user info and logout
-- [ ] Activity detail modal
-- [ ] Date navigation (view historical containers)
+### Phase 4: Backlog Views & Navigation ✅ COMPLETED
+- [x] React Router v7 setup with dedicated routes per backlog
+- [x] AnnualBacklog, MonthlyBacklog, WeeklySprint, DailyChecklist dedicated page components
+- [x] `useBacklog` custom hook for shared state/CRUD logic
+- [x] MainLayout with sidebar (Sidebar) and header (Header)
+- [x] Sidebar navigation with active link highlighting
+- [x] Header with user avatar, username, and logout
+- [x] ActivityDetailModal (read-only hierarchy view, Escape/backdrop close)
+- [x] DateNavigator component (ISO format dates, Sunday-start weeks)
+- [x] Historical container date navigation per backlog page
+- [x] MoveActivityModal with greyed-out already-in-backlog options
+- [x] Add/remove activity from container: POST/DELETE `/api/activities/{id}/containers/{containerId}`
+- [x] containerId filter on `GET /api/activities` (takes precedence over containerType)
+- [x] Frontend: 68 Vitest unit tests (was 41)
+- [x] Backend: 94 unit tests (was 80)
+- [x] **Tag: v0.3.0 - Backlog Views & Navigation Complete**
 
 ### Phase 5: Testing Infrastructure
 - [ ] Playwright E2E tests for activity management
@@ -114,6 +115,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Version History
+
+### [0.3.0] - 2026-03-25 - Backlog Views & Navigation Complete
+
+#### Added - React Router & Navigation
+- React Router v7 (`react-router-dom`) replacing the single-page dashboard
+- `router/index.tsx`: route tree — `/login`, `/annual`, `/monthly`, `/weekly`, `/daily`
+- `ProtectedRoute`: updated to use `<Outlet />` (layout route pattern)
+- `AuthContext`: exported `AuthContext` for direct test usage
+- Redirect from `/` to `/annual`
+
+#### Added - Layout System
+- `MainLayout`: flex layout (Header + Sidebar + main content via `<Outlet />`)
+- `Header`: app title, user avatar, username, logout button
+- `Sidebar`: nav links to all four backlogs with active link highlighting (NavLink)
+- CSS modules for all layout components
+
+#### Added - Dedicated Backlog Pages
+- `AnnualBacklog`, `MonthlyBacklog`, `WeeklySprint`, `DailyChecklist` page components
+- `useBacklog(containerType)` hook: loads containers + activities, exposes CRUD callbacks
+- `BacklogPage.module.css`: shared page-level styles
+- Each page owns: `DateNavigator`, `ActivityEditor`, `ActivityList`, `ActivityDetailModal`
+- `MoveActivityModal` on Annual/Monthly/Weekly (intentionally omitted on Daily)
+
+#### Added - DateNavigator Component
+- Prev/Next buttons to navigate historical containers
+- ISO date format: Annual → "2026", Monthly → "March 2026", Weekly → "Week of 2026-03-29" (Sunday start), Daily → "2026-03-25"
+- "Jump to current" link when viewing a historical container
+
+#### Added - ActivityDetailModal
+- Read-only view of activity: title, type badge, description, parent, children list, created date
+- Closes on Escape key or backdrop click
+
+#### Added - MoveActivityModal
+- Lists all non-archived containers for the page's container type
+- Greyed-out + disabled for containers the activity already belongs to
+- Shows 409 Conflict message if backend rejects a duplicate
+
+#### Added - Backend: Activity → Container Move Endpoints
+- `POST /api/activities/{id}/containers/{containerId}` — adds activity to container (204/409/404)
+- `DELETE /api/activities/{id}/containers/{containerId}` — removes activity from container (204/404)
+- `IActivityService.AddActivityToContainerAsync` / `RemoveActivityFromContainerAsync`
+
+#### Added - Backend: containerId filter on GET /api/activities
+- `GET /api/activities?containerId={n}` — filters by specific container (takes precedence over `containerType`)
+- Updated `IActivityService.GetActivitiesForUserAsync` signature to accept `int? containerId = null`
+
+#### Added - Frontend Service Updates
+- `activityService.getActivities(containerType?, containerId?)` — containerId takes precedence
+- `activityService.addToContainer(activityId, containerId)` — POST to move endpoint
+- `activityService.removeFromContainer(activityId, containerId)` — DELETE from container
+- `api.post` handles 204 No Content responses
+
+#### Added - ActivityList Enhancements
+- New optional props: `onEditActivity` (Edit button per item), `onMoveActivity` (Move button per item)
+- Edit/Move buttons use `stopPropagation` so detail-modal click still works on the row
+
+#### Added - Tests
+- Frontend Vitest: 68 tests total (was 41) — Sidebar, Header, DateNavigator, ActivityDetailModal, MoveActivityModal
+- Backend unit tests: 94 total (was 80) — containerId filtering, AddActivityToContainerAsync, RemoveActivityFromContainerAsync, controller endpoints
+
+#### Changed - App.tsx
+- Removed Dashboard component (replaced by dedicated page components)
+- `main.tsx` now mounts `<AuthProvider><RouterProvider router={router} /></AuthProvider>`
+
+---
 
 ### [0.2.0] - 2026-03-13 - Core Activity CRUD Complete
 
@@ -362,7 +428,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Notes
 
-- **Current Version**: v0.2.0 - Core Activity CRUD complete ✅
-- **Next Milestone**: v0.3.0 - Backlog Views & Navigation
+- **Current Version**: v0.3.0 - Backlog Views & Navigation complete ✅
+- **Next Milestone**: v0.4.0 - Testing Infrastructure (Playwright E2E)
 - **Target for MVP**: v1.0.0 - Full CRUD, backlogs, testing, and production deployment
-- **Last Updated**: 2026-03-13
+- **Last Updated**: 2026-03-25

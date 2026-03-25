@@ -1247,4 +1247,316 @@ public class ActivityServiceTests : IDisposable
     }
 
     #endregion
+
+    #region GetActivitiesForUserAsync - containerId filter Tests
+
+    [Fact]
+    public async Task GetActivitiesForUserAsync_WithContainerId_ReturnsOnlyActivitiesInThatContainer()
+    {
+        // Arrange
+        var container1 = new Container
+        {
+            UserId = TestUserId, Type = ContainerType.Annual,
+            StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            EndDate = new DateTime(2026, 12, 31, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        var container2 = new Container
+        {
+            UserId = TestUserId, Type = ContainerType.Monthly,
+            StartDate = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+            EndDate = new DateTime(2026, 3, 31, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddRangeAsync(container1, container2);
+        await _context.SaveChangesAsync();
+
+        var activity1 = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "Annual Only", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        var activity2 = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "Monthly Only", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddRangeAsync(activity1, activity2);
+        await _context.SaveChangesAsync();
+
+        await _context.ContainerActivities.AddRangeAsync(
+            new ContainerActivity { ContainerId = container1.Id, ActivityTemplateId = activity1.Id, AddedAt = DateTime.UtcNow, Order = 1 },
+            new ContainerActivity { ContainerId = container2.Id, ActivityTemplateId = activity2.Id, AddedAt = DateTime.UtcNow, Order = 1 }
+        );
+        await _context.SaveChangesAsync();
+
+        // Act: filter by container1's ID
+        var result = await _service.GetActivitiesForUserAsync(TestUserId, containerId: container1.Id);
+
+        // Assert
+        result.Should().HaveCount(1);
+        result[0].Title.Should().Be("Annual Only");
+    }
+
+    [Fact]
+    public async Task GetActivitiesForUserAsync_ContainerIdTakesPrecedenceOverContainerType()
+    {
+        // Arrange: one activity in an Annual container, filter by containerId
+        var container = new Container
+        {
+            UserId = TestUserId, Type = ContainerType.Annual,
+            StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "Annual Task", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        await _context.ContainerActivities.AddAsync(
+            new ContainerActivity { ContainerId = container.Id, ActivityTemplateId = activity.Id, AddedAt = DateTime.UtcNow, Order = 1 }
+        );
+        await _context.SaveChangesAsync();
+
+        // Act: pass containerType=Monthly but containerId points to an Annual container
+        var result = await _service.GetActivitiesForUserAsync(TestUserId, containerType: ContainerType.Monthly, containerId: container.Id);
+
+        // Assert: containerId wins — returns the activity even though containerType says Monthly
+        result.Should().HaveCount(1);
+        result[0].Title.Should().Be("Annual Task");
+    }
+
+    #endregion
+
+    #region AddActivityToContainerAsync Tests
+
+    [Fact]
+    public async Task AddActivityToContainerAsync_ValidRequest_CreatesContainerActivity()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId, Type = ContainerType.Weekly,
+            StartDate = new DateTime(2026, 3, 23, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "Move Me", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.AddActivityToContainerAsync(TestUserId, activity.Id, container.Id);
+
+        // Assert
+        result.Should().BeTrue();
+        var link = await _context.ContainerActivities
+            .FirstOrDefaultAsync(ca => ca.ActivityTemplateId == activity.Id && ca.ContainerId == container.Id);
+        link.Should().NotBeNull();
+        link!.Order.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AddActivityToContainerAsync_AlreadyInContainer_ReturnsNull()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId, Type = ContainerType.Weekly,
+            StartDate = new DateTime(2026, 3, 23, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "Already Here", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        await _context.ContainerActivities.AddAsync(
+            new ContainerActivity { ContainerId = container.Id, ActivityTemplateId = activity.Id, AddedAt = DateTime.UtcNow, Order = 1 }
+        );
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.AddActivityToContainerAsync(TestUserId, activity.Id, container.Id);
+
+        // Assert
+        result.Should().BeNull(); // Conflict
+    }
+
+    [Fact]
+    public async Task AddActivityToContainerAsync_ActivityNotOwnedByUser_ReturnsFalse()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId, Type = ContainerType.Annual,
+            StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var otherUsersActivity = new ActivityTemplate
+        {
+            UserId = "other_user", Title = "Not Mine", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(otherUsersActivity);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.AddActivityToContainerAsync(TestUserId, otherUsersActivity.Id, container.Id);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AddActivityToContainerAsync_ContainerNotOwnedByUser_ReturnsFalse()
+    {
+        // Arrange
+        var otherUsersContainer = new Container
+        {
+            UserId = "other_user", Type = ContainerType.Annual,
+            StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(otherUsersContainer);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "My Task", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.AddActivityToContainerAsync(TestUserId, activity.Id, otherUsersContainer.Id);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region RemoveActivityFromContainerAsync Tests
+
+    [Fact]
+    public async Task RemoveActivityFromContainerAsync_ValidRequest_RemovesContainerActivity()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId, Type = ContainerType.Annual,
+            StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "Remove Me", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        await _context.ContainerActivities.AddAsync(
+            new ContainerActivity { ContainerId = container.Id, ActivityTemplateId = activity.Id, AddedAt = DateTime.UtcNow, Order = 1 }
+        );
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.RemoveActivityFromContainerAsync(TestUserId, activity.Id, container.Id);
+
+        // Assert
+        result.Should().BeTrue();
+        var link = await _context.ContainerActivities
+            .FirstOrDefaultAsync(ca => ca.ActivityTemplateId == activity.Id && ca.ContainerId == container.Id);
+        link.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task RemoveActivityFromContainerAsync_NotInContainer_ReturnsFalse()
+    {
+        // Arrange
+        var container = new Container
+        {
+            UserId = TestUserId, Type = ContainerType.Annual,
+            StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(container);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "Not In Container", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        // Act (no ContainerActivity was created)
+        var result = await _service.RemoveActivityFromContainerAsync(TestUserId, activity.Id, container.Id);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RemoveActivityFromContainerAsync_ContainerOwnedByOtherUser_ReturnsFalse()
+    {
+        // Arrange
+        var otherUsersContainer = new Container
+        {
+            UserId = "other_user", Type = ContainerType.Annual,
+            StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = ContainerStatus.Active, CreatedAt = DateTime.UtcNow
+        };
+        await _context.Containers.AddAsync(otherUsersContainer);
+        await _context.SaveChangesAsync();
+
+        var activity = new ActivityTemplate
+        {
+            UserId = TestUserId, Title = "My Task", Type = ActivityType.Task,
+            IsRecurring = false, RecurrenceType = RecurrenceType.None, CreatedAt = DateTime.UtcNow
+        };
+        await _context.ActivityTemplates.AddAsync(activity);
+        await _context.SaveChangesAsync();
+
+        await _context.ContainerActivities.AddAsync(
+            new ContainerActivity { ContainerId = otherUsersContainer.Id, ActivityTemplateId = activity.Id, AddedAt = DateTime.UtcNow, Order = 1 }
+        );
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _service.RemoveActivityFromContainerAsync(TestUserId, activity.Id, otherUsersContainer.Id);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    #endregion
 }

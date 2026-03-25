@@ -103,11 +103,10 @@ public class ActivityService : IActivityService
     }
 
     /// <summary>
-    /// Gets all non-archived activities for a user, optionally filtered by container type.
-    /// When containerType is provided, only activities associated with at least one
-    /// container of that type are returned.
+    /// Gets all non-archived activities for a user, optionally filtered by container type or container ID.
+    /// When containerId is provided it takes precedence over containerType.
     /// </summary>
-    public async Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null)
+    public async Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null, int? containerId = null)
     {
         var query = _context.ActivityTemplates
             .Where(at => at.UserId == userId && at.ArchivedAt == null)
@@ -117,7 +116,13 @@ public class ActivityService : IActivityService
                 .ThenInclude(ca => ca.Container)
             .AsQueryable();
 
-        if (containerType.HasValue)
+        if (containerId.HasValue)
+        {
+            // Filter by specific container ID (overrides containerType)
+            query = query.Where(at =>
+                at.ContainerActivities.Any(ca => ca.ContainerId == containerId.Value && ca.Container.UserId == userId));
+        }
+        else if (containerType.HasValue)
         {
             query = query.Where(at =>
                 at.ContainerActivities.Any(ca => ca.Container.Type == containerType.Value));
@@ -128,6 +133,78 @@ public class ActivityService : IActivityService
             .ToListAsync();
 
         return activities.Select(MapToDto).ToList();
+    }
+
+    /// <summary>
+    /// Adds an activity to an additional container.
+    /// Returns null (conflict) if the association already exists, false if not found/unauthorized, true on success.
+    /// </summary>
+    public async Task<bool?> AddActivityToContainerAsync(string userId, int activityId, int containerId)
+    {
+        // Verify activity belongs to user and is not archived
+        var activity = await _context.ActivityTemplates
+            .FirstOrDefaultAsync(at => at.Id == activityId && at.UserId == userId && at.ArchivedAt == null);
+
+        if (activity == null)
+        {
+            return false;
+        }
+
+        // Verify container belongs to user
+        var container = await _context.Containers
+            .FirstOrDefaultAsync(c => c.Id == containerId && c.UserId == userId);
+
+        if (container == null)
+        {
+            return false;
+        }
+
+        // Check for existing association
+        var existingLink = await _context.ContainerActivities
+            .AnyAsync(ca => ca.ActivityTemplateId == activityId && ca.ContainerId == containerId);
+
+        if (existingLink)
+        {
+            return null; // Conflict: already in this container
+        }
+
+        var containerActivity = new ContainerActivity
+        {
+            ContainerId = containerId,
+            ActivityTemplateId = activityId,
+            AddedAt = DateTime.UtcNow,
+            Order = await GetNextOrderInContainerAsync(containerId),
+            IsRolledOver = false
+        };
+
+        _context.ContainerActivities.Add(containerActivity);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Removes an activity from a specific container without archiving the activity template.
+    /// </summary>
+    public async Task<bool> RemoveActivityFromContainerAsync(string userId, int activityId, int containerId)
+    {
+        // Find the ContainerActivity with authorization check on both sides
+        var containerActivity = await _context.ContainerActivities
+            .Include(ca => ca.Container)
+            .FirstOrDefaultAsync(ca =>
+                ca.ActivityTemplateId == activityId &&
+                ca.ContainerId == containerId &&
+                ca.Container.UserId == userId);
+
+        if (containerActivity == null)
+        {
+            return false;
+        }
+
+        _context.ContainerActivities.Remove(containerActivity);
+        await _context.SaveChangesAsync();
+
+        return true;
     }
 
     /// <summary>

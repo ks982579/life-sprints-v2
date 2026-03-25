@@ -32,6 +32,9 @@ export const api = {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     });
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+      return undefined as T;
+    }
     return response.json();
   },
 

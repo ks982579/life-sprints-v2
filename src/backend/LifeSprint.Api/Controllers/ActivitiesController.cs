@@ -70,16 +70,17 @@ public class ActivitiesController : ControllerBase
     /// Gets all non-archived activities for the current user.
     /// </summary>
     /// <param name="containerType">Optional filter: 0=Annual, 1=Monthly, 2=Weekly, 3=Daily</param>
+    /// <param name="containerId">Optional filter by specific container ID (overrides containerType)</param>
     /// <returns>List of user's activities</returns>
     /// <response code="200">Activities retrieved successfully</response>
     /// <response code="500">Internal server error</response>
     [HttpGet]
-    public async Task<IActionResult> GetActivities([FromQuery] ContainerType? containerType = null)
+    public async Task<IActionResult> GetActivities([FromQuery] ContainerType? containerType = null, [FromQuery] int? containerId = null)
     {
         try
         {
             var userId = GetCurrentUserId();
-            var activities = await _activityService.GetActivitiesForUserAsync(userId, containerType);
+            var activities = await _activityService.GetActivitiesForUserAsync(userId, containerType, containerId);
 
             return Ok(activities);
         }
@@ -224,6 +225,67 @@ public class ActivitiesController : ControllerBase
         catch (Exception)
         {
             return StatusCode(500, new { message = "An error occurred while deleting the activity" });
+        }
+    }
+
+    /// <summary>
+    /// Adds an activity to an additional container.
+    /// </summary>
+    /// <param name="id">Activity template ID</param>
+    /// <param name="containerId">Target container ID</param>
+    /// <returns>No content on success</returns>
+    /// <response code="204">Activity added to container</response>
+    /// <response code="404">Activity or container not found / access denied</response>
+    /// <response code="409">Activity already exists in this container</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPost("{id}/containers/{containerId}")]
+    public async Task<IActionResult> AddToContainer(int id, int containerId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var result = await _activityService.AddActivityToContainerAsync(userId, id, containerId);
+
+            return result switch
+            {
+                true => NoContent(),
+                null => Conflict(new { message = "Activity is already in this container" }),
+                false => NotFound(new { message = "Activity or container not found or access denied" }),
+            };
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while adding the activity to the container" });
+        }
+    }
+
+    /// <summary>
+    /// Removes an activity from a specific container (does not archive the activity).
+    /// </summary>
+    /// <param name="id">Activity template ID</param>
+    /// <param name="containerId">Container ID to remove activity from</param>
+    /// <returns>No content on success</returns>
+    /// <response code="204">Activity removed from container</response>
+    /// <response code="404">Association not found or access denied</response>
+    /// <response code="500">Internal server error</response>
+    [HttpDelete("{id}/containers/{containerId}")]
+    public async Task<IActionResult> RemoveFromContainer(int id, int containerId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var success = await _activityService.RemoveActivityFromContainerAsync(userId, id, containerId);
+
+            if (!success)
+            {
+                return NotFound(new { message = "Activity is not in this container or access denied" });
+            }
+
+            return NoContent();
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while removing the activity from the container" });
         }
     }
 

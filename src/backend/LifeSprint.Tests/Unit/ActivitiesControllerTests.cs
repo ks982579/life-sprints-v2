@@ -716,4 +716,72 @@ public class ActivitiesControllerTests
     }
 
     #endregion
+
+    #region AddToContainer Tests
+
+    [Fact]
+    public async Task AddToContainer_ServiceReturnsTrue_ReturnsNoContent()
+    {
+        _mockActivityService
+            .Setup(x => x.AddActivityToContainerAsync(TestUserId, 1, 10))
+            .ReturnsAsync(true);
+
+        var result = await _controller.AddToContainer(1, 10);
+
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task AddToContainer_ServiceReturnsNull_ReturnsConflict()
+    {
+        _mockActivityService
+            .Setup(x => x.AddActivityToContainerAsync(TestUserId, 1, 10))
+            .ReturnsAsync((bool?)null);
+
+        var result = await _controller.AddToContainer(1, 10);
+
+        result.Should().BeOfType<ConflictObjectResult>();
+    }
+
+    [Fact]
+    public async Task AddToContainer_ServiceReturnsFalse_ReturnsNotFound()
+    {
+        _mockActivityService
+            .Setup(x => x.AddActivityToContainerAsync(TestUserId, 1, 10))
+            .ReturnsAsync(false);
+
+        var result = await _controller.AddToContainer(1, 10);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    #endregion
+
+    #region RemoveFromContainer Tests
+
+    [Fact]
+    public async Task RemoveFromContainer_ServiceReturnsTrue_ReturnsNoContent()
+    {
+        _mockActivityService
+            .Setup(x => x.RemoveActivityFromContainerAsync(TestUserId, 1, 10))
+            .ReturnsAsync(true);
+
+        var result = await _controller.RemoveFromContainer(1, 10);
+
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task RemoveFromContainer_ServiceReturnsFalse_ReturnsNotFound()
+    {
+        _mockActivityService
+            .Setup(x => x.RemoveActivityFromContainerAsync(TestUserId, 1, 10))
+            .ReturnsAsync(false);
+
+        var result = await _controller.RemoveFromContainer(1, 10);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    #endregion
 }
