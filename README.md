@@ -1,5 +1,7 @@
 # Life Sprint
 
+> v0.3.0
+
 A sprint planning and task management application for organizing your life through annual backlogs, monthly plans, weekly sprints, and daily checklists.
 
 ## Tech Stack
