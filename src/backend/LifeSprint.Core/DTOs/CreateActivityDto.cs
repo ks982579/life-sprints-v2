@@ -49,7 +49,13 @@ public record CreateActivityDto
 
     /// <summary>
     /// Optional: ID of the container to add this activity to.
-    /// If null, will be added to the current Annual backlog.
+    /// If null, falls back to ContainerType or defaults to Annual.
     /// </summary>
     public int? ContainerId { get; init; }
+
+    /// <summary>
+    /// Optional: Container type to resolve the current container when ContainerId is not provided.
+    /// Defaults to Annual if neither ContainerId nor DefaultContainerType is provided.
+    /// </summary>
+    public ContainerType? DefaultContainerType { get; init; }
 }

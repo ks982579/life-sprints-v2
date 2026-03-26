@@ -72,6 +72,15 @@
   margin: 1rem 0;
 }
 
+.groupLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6c757d;
+  margin: 0.75rem 0 0.3rem;
+}
+
 .containerList {
   list-style: none;
   padding: 0;

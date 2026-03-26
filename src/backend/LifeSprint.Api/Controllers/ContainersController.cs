@@ -111,6 +111,41 @@ public class ContainersController : ControllerBase
     }
 
     /// <summary>
+    /// Creates a new container for the current period, optionally rolling over incomplete items.
+    /// Returns 409 Conflict if a container already exists for the current period.
+    /// </summary>
+    /// <param name="dto">Container type and rollover preference</param>
+    /// <returns>Newly created container</returns>
+    /// <response code="201">Container created successfully</response>
+    /// <response code="409">A container already exists for the current period</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPost("new")]
+    public async Task<IActionResult> CreateNew([FromBody] CreateNewContainerDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var userId = GetCurrentUserId();
+            var container = await _containerService.CreateNewContainerAsync(userId, dto.Type, dto.RolloverIncomplete);
+
+            if (container == null)
+            {
+                return Conflict(new { message = $"A container already exists for the current {dto.Type} period. No new container is needed yet." });
+            }
+
+            return StatusCode(201, container);
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while creating the container" });
+        }
+    }
+
+    /// <summary>
     /// Gets the current user's ID from the authenticated claims.
     /// </summary>
     /// <returns>User ID</returns>

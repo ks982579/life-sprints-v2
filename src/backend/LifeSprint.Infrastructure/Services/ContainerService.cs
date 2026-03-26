@@ -119,6 +119,83 @@ public class ContainerService : IContainerService
     }
 
     /// <summary>
+    /// Creates a new container for the current period if one does not already exist.
+    /// Returns null if a container already exists for this period (caller returns 409).
+    /// Optionally rolls over incomplete items from the most recent previous container.
+    /// </summary>
+    public async Task<ContainerResponseDto?> CreateNewContainerAsync(string userId, ContainerType type, bool rolloverIncomplete)
+    {
+        var (startDate, endDate) = GetDateRangeForType(type);
+
+        // Return null (conflict) if an active container already exists for this period
+        var existing = await _context.Containers
+            .FirstOrDefaultAsync(c =>
+                c.UserId == userId &&
+                c.Type == type &&
+                c.Status == ContainerStatus.Active &&
+                c.StartDate == startDate);
+
+        if (existing != null)
+        {
+            return null;
+        }
+
+        // Find the most recent previous container for potential rollover
+        Container? previousContainer = null;
+        if (rolloverIncomplete)
+        {
+            previousContainer = await _context.Containers
+                .Where(c => c.UserId == userId && c.Type == type && c.StartDate < startDate)
+                .OrderByDescending(c => c.StartDate)
+                .FirstOrDefaultAsync();
+        }
+
+        // Create the new container
+        var newContainer = new Container
+        {
+            UserId = userId,
+            Type = type,
+            StartDate = startDate,
+            EndDate = endDate,
+            Status = ContainerStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Containers.Add(newContainer);
+        await _context.SaveChangesAsync();
+
+        // Roll over incomplete items from the previous container
+        if (rolloverIncomplete && previousContainer != null)
+        {
+            var incompleteActivities = await _context.ContainerActivities
+                .Where(ca => ca.ContainerId == previousContainer.Id && ca.CompletedAt == null)
+                .ToListAsync();
+
+            foreach (var ca in incompleteActivities)
+            {
+                var alreadyLinked = await _context.ContainerActivities
+                    .AnyAsync(x => x.ActivityTemplateId == ca.ActivityTemplateId && x.ContainerId == newContainer.Id);
+
+                if (!alreadyLinked)
+                {
+                    _context.ContainerActivities.Add(new ContainerActivity
+                    {
+                        ContainerId = newContainer.Id,
+                        ActivityTemplateId = ca.ActivityTemplateId,
+                        AddedAt = DateTime.UtcNow,
+                        Order = ca.Order,
+                        IsRolledOver = true
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        return await GetContainerAsync(userId, newContainer.Id);
+    }
+
+    /// <summary>
     /// Calculates the start and end dates for a container based on its type.
     /// </summary>
     /// <remarks>

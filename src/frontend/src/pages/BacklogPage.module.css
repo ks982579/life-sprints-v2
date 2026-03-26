@@ -32,6 +32,29 @@
   background: #1442a8;
 }
 
+.headerButtons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.secondaryButton {
+  background: white;
+  color: #495057;
+  border: 1.5px solid #dee2e6;
+  border-radius: 6px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.secondaryButton:hover {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+}
+
 .error {
   background: #fff3f3;
   border: 1px solid #f8d7da;

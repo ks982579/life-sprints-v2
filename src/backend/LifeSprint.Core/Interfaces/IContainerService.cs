@@ -56,4 +56,17 @@ public interface IContainerService
     /// <param name="status">New status</param>
     /// <returns>Updated container with activity counts or null if not found/unauthorized</returns>
     Task<ContainerResponseDto?> UpdateContainerStatusAsync(string userId, int containerId, ContainerStatus status);
+
+    /// <summary>
+    /// Creates a new container for the current period if one does not already exist.
+    /// Optionally rolls over incomplete items from the most recent previous container.
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="type">Container type</param>
+    /// <param name="rolloverIncomplete">Whether to carry forward incomplete items</param>
+    /// <returns>
+    /// The new container, or null if a container already exists for the current period
+    /// (caller should respond with 409 Conflict).
+    /// </returns>
+    Task<ContainerResponseDto?> CreateNewContainerAsync(string userId, ContainerType type, bool rolloverIncomplete);
 }

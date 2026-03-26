@@ -17,6 +17,13 @@ const containerTypeLabels: Record<number, string> = {
   [ContainerType.Daily]: 'Daily',
 };
 
+const containerTypeOrder = [
+  ContainerType.Annual,
+  ContainerType.Monthly,
+  ContainerType.Weekly,
+  ContainerType.Daily,
+];
+
 export function MoveActivityModal({
   activity,
   currentContainerId,
@@ -41,10 +48,19 @@ export function MoveActivityModal({
   // Determine which containers the activity already belongs to
   const activityContainerIds = new Set(activity.containers.map((c) => c.containerId));
 
-  // Show all non-archived containers; grey out ones the activity is already in
-  const options = availableContainers.filter(
+  // Show all non-archived containers grouped by type
+  const activeContainers = availableContainers.filter(
     (c) => c.status !== ContainerStatus.Archived
   );
+
+  // Group by type, in hierarchy order
+  const grouped = containerTypeOrder
+    .map((type) => ({
+      type,
+      label: containerTypeLabels[type],
+      containers: activeContainers.filter((c) => c.type === type),
+    }))
+    .filter((group) => group.containers.length > 0);
 
   const handleMove = async (targetId: number) => {
     if (activityContainerIds.has(targetId)) {
@@ -56,7 +72,7 @@ export function MoveActivityModal({
       setErrorMessage(null);
       await onMove(targetId);
     } catch {
-      setErrorMessage('Failed to move activity. Please try again.');
+      setErrorMessage('Failed to add activity. Please try again.');
     } finally {
       setMoving(false);
     }
@@ -76,39 +92,41 @@ export function MoveActivityModal({
           <div className={styles.error}>{errorMessage}</div>
         )}
 
-        {options.length === 0 ? (
+        {grouped.length === 0 ? (
           <p className={styles.empty}>No available backlogs.</p>
         ) : (
-          <ul className={styles.containerList}>
-            {options.map((container) => {
-              const alreadyIn = activityContainerIds.has(container.id);
-              const isCurrent = container.id === currentContainerId;
+          grouped.map((group) => (
+            <div key={group.type}>
+              <p className={styles.groupLabel}>{group.label}</p>
+              <ul className={styles.containerList}>
+                {group.containers.map((container) => {
+                  const alreadyIn = activityContainerIds.has(container.id);
+                  const isCurrent = container.id === currentContainerId;
 
-              return (
-                <li key={container.id} className={styles.containerItem}>
-                  <button
-                    className={`${styles.containerButton} ${alreadyIn ? styles.alreadyIn : ''}`}
-                    onClick={() => handleMove(container.id)}
-                    disabled={moving || alreadyIn}
-                    title={alreadyIn ? 'Already in this backlog' : undefined}
-                  >
-                    <span className={styles.containerType}>
-                      {containerTypeLabels[container.type]}
-                    </span>
-                    <span className={styles.containerDate}>
-                      {new Date(container.startDate).toLocaleDateString('en-GB')}
-                    </span>
-                    {isCurrent && (
-                      <span className={styles.currentTag}>current</span>
-                    )}
-                    {alreadyIn && (
-                      <span className={styles.checkmark}>&#10003;</span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                  return (
+                    <li key={container.id} className={styles.containerItem}>
+                      <button
+                        className={`${styles.containerButton} ${alreadyIn ? styles.alreadyIn : ''}`}
+                        onClick={() => handleMove(container.id)}
+                        disabled={moving || alreadyIn}
+                        title={alreadyIn ? 'Already in this backlog' : undefined}
+                      >
+                        <span className={styles.containerDate}>
+                          {new Date(container.startDate).toLocaleDateString('en-GB')}
+                        </span>
+                        {isCurrent && (
+                          <span className={styles.currentTag}>current</span>
+                        )}
+                        {alreadyIn && (
+                          <span className={styles.checkmark}>&#10003;</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))
         )}
       </div>
     </div>

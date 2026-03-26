@@ -80,11 +80,12 @@ public class ActivityService : IActivityService
         }
         else
         {
-            // Default to current Annual backlog
-            container = await _containerService.GetOrCreateCurrentContainerAsync(userId, ContainerType.Annual);
+            // Use provided ContainerType, or fall back to Annual
+            var fallbackType = dto.DefaultContainerType ?? ContainerType.Annual;
+            container = await _containerService.GetOrCreateCurrentContainerAsync(userId, fallbackType);
         }
 
-        // Create the container-activity association
+        // Create the container-activity association for the target container
         var containerActivity = new ContainerActivity
         {
             ContainerId = container.Id,
@@ -95,6 +96,26 @@ public class ActivityService : IActivityService
         };
 
         _context.ContainerActivities.Add(containerActivity);
+
+        // Auto-propagate to parent containers (Weekly → Monthly → Annual, etc.)
+        foreach (var parentType in GetParentContainerTypes(container.Type))
+        {
+            var parentContainer = await _containerService.GetOrCreateCurrentContainerAsync(userId, parentType);
+            var alreadyLinked = await _context.ContainerActivities
+                .AnyAsync(ca => ca.ActivityTemplateId == activityTemplate.Id && ca.ContainerId == parentContainer.Id);
+            if (!alreadyLinked)
+            {
+                _context.ContainerActivities.Add(new ContainerActivity
+                {
+                    ContainerId = parentContainer.Id,
+                    ActivityTemplateId = activityTemplate.Id,
+                    AddedAt = DateTime.UtcNow,
+                    Order = await GetNextOrderInContainerAsync(parentContainer.Id),
+                    IsRolledOver = false
+                });
+            }
+        }
+
         await _context.SaveChangesAsync();
 
         // Return the created activity with container associations
@@ -178,6 +199,26 @@ public class ActivityService : IActivityService
         };
 
         _context.ContainerActivities.Add(containerActivity);
+
+        // Auto-propagate to parent containers
+        foreach (var parentType in GetParentContainerTypes(container.Type))
+        {
+            var parentContainer = await _containerService.GetOrCreateCurrentContainerAsync(userId, parentType);
+            var alreadyLinked = await _context.ContainerActivities
+                .AnyAsync(ca => ca.ActivityTemplateId == activityId && ca.ContainerId == parentContainer.Id);
+            if (!alreadyLinked)
+            {
+                _context.ContainerActivities.Add(new ContainerActivity
+                {
+                    ContainerId = parentContainer.Id,
+                    ActivityTemplateId = activityId,
+                    AddedAt = DateTime.UtcNow,
+                    Order = await GetNextOrderInContainerAsync(parentContainer.Id),
+                    IsRolledOver = false
+                });
+            }
+        }
+
         await _context.SaveChangesAsync();
 
         return true;
@@ -363,24 +404,32 @@ public class ActivityService : IActivityService
             return null; // Not found or unauthorized
         }
 
-        // Find the ContainerActivity record
-        var containerActivity = await _context.ContainerActivities
+        // Verify the specific container association exists and belongs to the user
+        var targetContainerActivity = await _context.ContainerActivities
             .Include(ca => ca.Container)
             .FirstOrDefaultAsync(ca => ca.ActivityTemplateId == activityId && ca.ContainerId == containerId);
 
-        if (containerActivity == null)
+        if (targetContainerActivity == null)
         {
             throw new InvalidOperationException($"Activity {activityId} is not associated with container {containerId}");
         }
 
-        // Verify the container belongs to the user
-        if (containerActivity.Container.UserId != userId)
+        if (targetContainerActivity.Container.UserId != userId)
         {
             return null; // Unauthorized access to container
         }
 
-        // Toggle completion status
-        containerActivity.CompletedAt = isCompleted ? DateTime.UtcNow : null;
+        // Toggle completion across ALL containers for this activity (shared completion state)
+        var allContainerActivities = await _context.ContainerActivities
+            .Include(ca => ca.Container)
+            .Where(ca => ca.ActivityTemplateId == activityId && ca.Container.UserId == userId)
+            .ToListAsync();
+
+        var completedAt = isCompleted ? DateTime.UtcNow : (DateTime?)null;
+        foreach (var ca in allContainerActivities)
+        {
+            ca.CompletedAt = completedAt;
+        }
 
         await _context.SaveChangesAsync();
 
@@ -424,6 +473,21 @@ public class ActivityService : IActivityService
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Returns the parent container types for a given type (Daily→Weekly→Monthly→Annual).
+    /// Used to auto-propagate activities upward when added to a lower-level container.
+    /// </summary>
+    private static ContainerType[] GetParentContainerTypes(ContainerType type)
+    {
+        return type switch
+        {
+            ContainerType.Daily => [ContainerType.Weekly, ContainerType.Monthly, ContainerType.Annual],
+            ContainerType.Weekly => [ContainerType.Monthly, ContainerType.Annual],
+            ContainerType.Monthly => [ContainerType.Annual],
+            _ => []
+        };
     }
 
     /// <summary>

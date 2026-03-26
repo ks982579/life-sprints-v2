@@ -1,73 +1,111 @@
-# React + TypeScript + Vite
+# Life Sprint — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite frontend for the Life Sprint application.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The frontend provides three backlog pages (Annual, Monthly, Weekly) that all share the same structure. A fourth (Daily) exists in the type system but is not yet surfaced in the UI.
 
-## React Compiler
+Each page lets you:
+- View todo items assigned to that backlog
+- Create new items (automatically added to higher-level backlogs too)
+- Check items complete (syncs across all backlogs)
+- Add existing items to other backlogs via the "Add to Backlog" modal
+- Start a new period (New Sprint / New Month / New Year) with optional rollover of incomplete items
+- Navigate to historical containers via the date navigator
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+## Development
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev        # http://localhost:3000 with HMR
+npm run build      # Production build (also runs tsc)
+npm test           # Vitest unit tests
+npm run test:e2e   # Playwright E2E tests
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The dev server proxies `/api` requests to the backend at `http://localhost:5000`. In production the NGINX reverse proxy handles this.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Key Files
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+├── components/
+│   ├── Activities/
+│   │   ├── ActivityEditor.tsx       # Create/edit form
+│   │   ├── ActivityList.tsx         # Item list with checkbox, edit, move, delete
+│   │   ├── ActivityDetailModal.tsx  # Read-only detail view
+│   │   ├── MoveActivityModal.tsx    # Add item to another backlog (all types, grouped)
+│   │   ├── NewContainerModal.tsx    # Start new period with rollover option
+│   │   └── BacklogTabs.tsx          # Tab navigation component
+│   ├── Navigation/
+│   │   └── DateNavigator.tsx        # Navigate historical containers
+│   └── Auth/
+│       ├── LoginPage.tsx
+│       └── ProtectedRoute.tsx
+├── hooks/
+│   └── useBacklog.ts                # Core state hook used by all backlog pages
+├── pages/
+│   ├── AnnualBacklog.tsx
+│   ├── MonthlyBacklog.tsx
+│   └── WeeklySprint.tsx
+├── services/
+│   ├── api.ts                       # Fetch wrapper with credentials
+│   ├── activityService.ts           # Todo item CRUD + container operations
+│   └── containerService.ts          # Backlog container CRUD + createNewContainer
+├── types/
+│   └── activity.ts                  # All TypeScript types (enums, DTOs, models)
+└── context/
+    └── AuthContext.tsx
+```
+
+## Important Patterns
+
+### Enum Pattern
+
+TypeScript enums are avoided due to `verbatimModuleSyntax`. Use const-object pattern:
+
+```typescript
+export type ContainerType = 0 | 1 | 2 | 3;
+export const ContainerType = {
+  Annual:  0 as ContainerType,
+  Monthly: 1 as ContainerType,
+  Weekly:  2 as ContainerType,
+  Daily:   3 as ContainerType,
+} as const;
+```
+
+### Type Imports
+
+Always use `type` keyword for pure type imports:
+
+```typescript
+import { ContainerType, type Activity, type Container } from '../types';
+```
+
+### Creating Items
+
+Pass `defaultContainerType` when creating items so they land in the right backlog:
+
+```typescript
+await handleCreate({
+  ...data,
+  containerId: selectedContainerId,          // specific container if user navigated to one
+  defaultContainerType: ContainerType.Weekly // fallback if containerId is undefined
+});
+```
+
+The backend auto-propagates the item upward (Weekly → Monthly → Annual).
+
+### All-Container Modal Data
+
+Each backlog page fetches all containers (all types) separately for the `MoveActivityModal`:
+
+```typescript
+const [allContainers, setAllContainers] = useState<Container[]>([]);
+useEffect(() => {
+  containerService.getContainers().then(setAllContainers);
+}, []);
+```
+
+This is separate from the `containers` list in `useBacklog`, which only holds the current page's type.

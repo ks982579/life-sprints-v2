@@ -87,6 +87,7 @@ export interface CreateActivityDto {
   isRecurring?: boolean;
   recurrenceType?: RecurrenceType;
   containerId?: number;
+  defaultContainerType?: ContainerType;
 }
 
 export interface UpdateActivityDto {

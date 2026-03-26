@@ -35,7 +35,7 @@ services:
       - GitHub__CallbackUrl=${GITHUB_CALLBACK_URL:-http://localhost/api/auth/github/callback}
       - CorsOrigins=http://localhost:3000,http://localhost
       - ASPNETCORE_URLS=http://+:5000
-      - DOTNET_CLI_HOME=/dotnet-home
+      - DOTNET_CLI_HOME=/tmp/dotnet-home
       - NUGET_PACKAGES=/nuget/packages
     ports:
       - "5000:5000"

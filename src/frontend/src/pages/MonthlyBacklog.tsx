@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBacklog } from '../hooks/useBacklog';
 import { ActivityList } from '../components/Activities/ActivityList';
 import { ActivityEditor } from '../components/Activities/ActivityEditor';
 import { ActivityDetailModal } from '../components/Activities/ActivityDetailModal';
 import { MoveActivityModal } from '../components/Activities/MoveActivityModal';
+import { NewContainerModal } from '../components/Activities/NewContainerModal';
 import { DateNavigator } from '../components/Navigation/DateNavigator';
 import { activityService } from '../services/activityService';
-import { ContainerType, RecurrenceType, type Activity, type ActivityType } from '../types';
+import { containerService } from '../services/containerService';
+import { ContainerType, RecurrenceType, type Activity, type ActivityType, type Container } from '../types';
 import styles from './BacklogPage.module.css';
 
 export function MonthlyBacklog() {
@@ -28,6 +30,12 @@ export function MonthlyBacklog() {
   const [editingActivity, setEditingActivity] = useState<Activity | undefined>();
   const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
   const [moveActivity, setMoveActivity] = useState<Activity | null>(null);
+  const [showNewContainer, setShowNewContainer] = useState(false);
+  const [allContainers, setAllContainers] = useState<Container[]>([]);
+
+  useEffect(() => {
+    containerService.getContainers().then(setAllContainers).catch(console.error);
+  }, []);
 
   const handleSave = async (data: {
     title: string;
@@ -40,7 +48,7 @@ export function MonthlyBacklog() {
     if (editingActivity) {
       await handleUpdate(editingActivity.id, data);
     } else {
-      await handleCreate({ ...data, containerId: selectedContainerId });
+      await handleCreate({ ...data, containerId: selectedContainerId, defaultContainerType: ContainerType.Monthly });
     }
     setShowEditor(false);
     setEditingActivity(undefined);
@@ -61,13 +69,25 @@ export function MonthlyBacklog() {
     setShowEditor(!showEditor);
   };
 
+  const handleContainerCreated = async () => {
+    setShowNewContainer(false);
+    await reload();
+    const updated = await containerService.getContainers();
+    setAllContainers(updated);
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <h2 className={styles.pageTitle}>Monthly Backlog</h2>
-        <button className={styles.newButton} onClick={handleNewItem}>
-          {showEditor && !editingActivity ? 'Cancel' : 'New Item'}
-        </button>
+        <div className={styles.headerButtons}>
+          <button className={styles.secondaryButton} onClick={() => setShowNewContainer(true)}>
+            New Month
+          </button>
+          <button className={styles.newButton} onClick={handleNewItem}>
+            {showEditor && !editingActivity ? 'Cancel' : 'New Item'}
+          </button>
+        </div>
       </div>
 
       <DateNavigator
@@ -113,13 +133,22 @@ export function MonthlyBacklog() {
         <MoveActivityModal
           activity={moveActivity}
           currentContainerId={selectedContainerId ?? null}
-          availableContainers={containers}
+          availableContainers={allContainers}
           onMove={async (targetContainerId) => {
             await activityService.addToContainer(moveActivity.id, targetContainerId);
             setMoveActivity(null);
             await reload();
           }}
           onClose={() => setMoveActivity(null)}
+        />
+      )}
+
+      {showNewContainer && (
+        <NewContainerModal
+          containerType={ContainerType.Monthly}
+          label="Month"
+          onCreated={handleContainerCreated}
+          onClose={() => setShowNewContainer(false)}
         />
       )}
     </div>
