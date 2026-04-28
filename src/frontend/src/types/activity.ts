@@ -6,13 +6,13 @@ export const ActivityType = {
   Task: 3 as ActivityType,
 } as const;
 
-export type RecurrenceType = 0 | 1 | 2 | 3 | 4;
+export type RecurrenceType = 0 | 1 | 2 | 3 | 99;
 export const RecurrenceType = {
-  None: 0 as RecurrenceType,
-  Daily: 1 as RecurrenceType,
+  Annual: 0 as RecurrenceType,
+  Monthly: 1 as RecurrenceType,
   Weekly: 2 as RecurrenceType,
-  Monthly: 3 as RecurrenceType,
-  Annual: 4 as RecurrenceType,
+  Daily: 3 as RecurrenceType,
+  None: 99 as RecurrenceType,
 } as const;
 
 export type ContainerType = 0 | 1 | 2 | 3;
@@ -88,6 +88,7 @@ export interface CreateActivityDto {
   recurrenceType?: RecurrenceType;
   containerId?: number;
   defaultContainerType?: ContainerType;
+  skipContainerLink?: boolean;
 }
 
 export interface UpdateActivityDto {

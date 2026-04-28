@@ -60,6 +60,7 @@ public interface IContainerService
     /// <summary>
     /// Creates a new container for the current period if one does not already exist.
     /// Optionally rolls over incomplete items from the most recent previous container.
+    /// Also instantiates any matching recurring templates for the new period.
     /// </summary>
     /// <param name="userId">User ID</param>
     /// <param name="type">Container type</param>

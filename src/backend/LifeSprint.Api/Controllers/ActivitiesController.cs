@@ -75,12 +75,12 @@ public class ActivitiesController : ControllerBase
     /// <response code="200">Activities retrieved successfully</response>
     /// <response code="500">Internal server error</response>
     [HttpGet]
-    public async Task<IActionResult> GetActivities([FromQuery] ContainerType? containerType = null, [FromQuery] int? containerId = null)
+    public async Task<IActionResult> GetActivities([FromQuery] ContainerType? containerType = null, [FromQuery] int? containerId = null, [FromQuery] bool? isRecurring = null, [FromQuery] RecurrenceType? recurrenceType = null)
     {
         try
         {
             var userId = GetCurrentUserId();
-            var activities = await _activityService.GetActivitiesForUserAsync(userId, containerType, containerId);
+            var activities = await _activityService.GetActivitiesForUserAsync(userId, containerType, containerId, isRecurring, recurrenceType);
 
             return Ok(activities);
         }
@@ -256,6 +256,36 @@ public class ActivitiesController : ControllerBase
         catch (Exception)
         {
             return StatusCode(500, new { message = "An error occurred while adding the activity to the container" });
+        }
+    }
+
+    /// <summary>
+    /// Reorders an activity within a container by swapping it with the adjacent item.
+    /// </summary>
+    /// <param name="id">Activity template ID</param>
+    /// <param name="dto">Reorder details: containerId and direction ("up" or "down")</param>
+    /// <returns>No content on success</returns>
+    /// <response code="204">Activity reordered successfully</response>
+    /// <response code="404">Activity/container not found, unauthorized, or already at boundary</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPatch("{id}/reorder")]
+    public async Task<IActionResult> ReorderActivity(int id, [FromBody] ReorderActivityDto dto)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var result = await _activityService.ReorderActivityAsync(userId, id, dto.ContainerId, dto.Direction);
+
+            if (!result)
+            {
+                return NotFound(new { message = "Activity or container not found, or item is already at the boundary" });
+            }
+
+            return NoContent();
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "An error occurred while reordering the activity" });
         }
     }
 

@@ -31,6 +31,34 @@ export function Sidebar() {
           Daily Checklist
         </NavLink>
       </div>
+
+      <div className={styles.section}>
+        <span className={styles.sectionLabel}>Recurring Items</span>
+        <NavLink
+          to="/recurring/annual"
+          className={({ isActive }) => `${styles.navLink}${isActive ? ` ${styles.active}` : ''}`}
+        >
+          Annual
+        </NavLink>
+        <NavLink
+          to="/recurring/monthly"
+          className={({ isActive }) => `${styles.navLink}${isActive ? ` ${styles.active}` : ''}`}
+        >
+          Monthly
+        </NavLink>
+        <NavLink
+          to="/recurring/weekly"
+          className={({ isActive }) => `${styles.navLink}${isActive ? ` ${styles.active}` : ''}`}
+        >
+          Weekly Sprint
+        </NavLink>
+        <NavLink
+          to="/recurring/daily"
+          className={({ isActive }) => `${styles.navLink}${isActive ? ` ${styles.active}` : ''}`}
+        >
+          Daily Checklist
+        </NavLink>
+      </div>
     </nav>
   );
 }

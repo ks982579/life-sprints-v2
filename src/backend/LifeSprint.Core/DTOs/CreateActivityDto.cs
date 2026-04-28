@@ -58,4 +58,10 @@ public record CreateActivityDto
     /// Defaults to Annual if neither ContainerId nor DefaultContainerType is provided.
     /// </summary>
     public ContainerType? DefaultContainerType { get; init; }
+
+    /// <summary>
+    /// When true, the activity is created as a pure template with no container association.
+    /// Used for recurring item templates created from the Recurring Items section.
+    /// </summary>
+    public bool SkipContainerLink { get; init; } = false;
 }

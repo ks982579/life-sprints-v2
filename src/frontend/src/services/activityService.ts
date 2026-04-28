@@ -1,15 +1,36 @@
 import { api } from './api';
-import { type Activity, type CreateActivityDto, type UpdateActivityDto, type ContainerType } from '../types';
+import { type Activity, type CreateActivityDto, type UpdateActivityDto, type ContainerType, type RecurrenceType } from '../types';
+
+interface GetActivitiesOptions {
+  containerType?: ContainerType;
+  containerId?: number;
+  isRecurring?: boolean;
+  recurrenceType?: RecurrenceType;
+}
 
 export const activityService = {
-  // Get all activities for the current user, optionally filtered by container type or specific container ID.
+  // Get all activities for the current user, optionally filtered by container type, container ID, or recurring flags.
   // When containerId is provided it takes precedence over containerType.
-  getActivities: async (containerType?: ContainerType, containerId?: number): Promise<Activity[]> => {
+  getActivities: async (containerTypeOrOptions?: ContainerType | GetActivitiesOptions, containerId?: number): Promise<Activity[]> => {
     const params = new URLSearchParams();
-    if (containerId !== undefined) {
-      params.set('containerId', String(containerId));
-    } else if (containerType !== undefined) {
-      params.set('containerType', String(containerType));
+    let opts: GetActivitiesOptions = {};
+
+    if (typeof containerTypeOrOptions === 'object' && containerTypeOrOptions !== null) {
+      opts = containerTypeOrOptions;
+    } else if (containerTypeOrOptions !== undefined) {
+      opts = { containerType: containerTypeOrOptions, containerId };
+    }
+
+    if (opts.containerId !== undefined) {
+      params.set('containerId', String(opts.containerId));
+    } else if (opts.containerType !== undefined) {
+      params.set('containerType', String(opts.containerType));
+    }
+    if (opts.isRecurring !== undefined) {
+      params.set('isRecurring', String(opts.isRecurring));
+    }
+    if (opts.recurrenceType !== undefined) {
+      params.set('recurrenceType', String(opts.recurrenceType));
     }
     const qs = params.toString();
     return api.get<Activity[]>(qs ? `/activities?${qs}` : '/activities');
@@ -38,6 +59,11 @@ export const activityService = {
   // Delete (archive) an activity
   deleteActivity: async (id: number): Promise<void> => {
     return api.delete(`/activities/${id}`);
+  },
+
+  // Reorder an activity within a container (direction: 'up' | 'down')
+  reorderActivity: async (activityId: number, containerId: number, direction: 'up' | 'down'): Promise<void> => {
+    return api.patch<void>(`/activities/${activityId}/reorder`, { containerId, direction });
   },
 
   // Add an activity to an additional container (move/copy workflow)

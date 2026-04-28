@@ -25,15 +25,17 @@ public interface IActivityService
     Task<ActivityResponseDto> CreateActivityAsync(string userId, CreateActivityDto dto);
 
     /// <summary>
-    /// Gets all activities for a user, optionally filtered by container type or specific container ID.
+    /// Gets all activities for a user, optionally filtered by container type, container ID, or recurring flags.
     /// When <paramref name="containerId"/> is provided it takes precedence over <paramref name="containerType"/>.
     /// Returns all non-archived activities with their container associations.
     /// </summary>
     /// <param name="userId">User ID to filter by</param>
     /// <param name="containerType">Optional container type filter (Annual/Monthly/Weekly/Daily)</param>
     /// <param name="containerId">Optional specific container ID filter; overrides containerType when set</param>
-    /// <returns>List of activities belonging to at least one matching container</returns>
-    Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null, int? containerId = null);
+    /// <param name="isRecurring">Optional filter for recurring templates</param>
+    /// <param name="recurrenceType">Optional recurrence type filter (requires isRecurring=true to be meaningful)</param>
+    /// <returns>List of activities matching all provided filters</returns>
+    Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null, int? containerId = null, bool? isRecurring = null, RecurrenceType? recurrenceType = null);
 
     /// <summary>
     /// Gets a single activity by ID.
@@ -93,4 +95,14 @@ public interface IActivityService
     /// <param name="containerId">Container ID to remove activity from</param>
     /// <returns>True if removed, false if not found/unauthorized</returns>
     Task<bool> RemoveActivityFromContainerAsync(string userId, int activityId, int containerId);
+
+    /// <summary>
+    /// Reorders an activity within a container by swapping its Order with the adjacent item.
+    /// </summary>
+    /// <param name="userId">User ID (for authorization)</param>
+    /// <param name="activityId">Activity template ID</param>
+    /// <param name="containerId">Container in which to reorder</param>
+    /// <param name="direction">"up" to move toward lower order, "down" to move toward higher order</param>
+    /// <returns>True on success, false if not found, unauthorized, already at boundary, or invalid direction</returns>
+    Task<bool> ReorderActivityAsync(string userId, int activityId, int containerId, string direction);
 }

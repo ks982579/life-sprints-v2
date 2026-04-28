@@ -3,6 +3,7 @@ import { MainLayout } from '../components/Layout';
 import { ProtectedRoute } from '../components/Auth/ProtectedRoute';
 import { LoginPage } from '../components/Auth/LoginPage';
 import { AnnualBacklog, MonthlyBacklog, WeeklySprint, DailyChecklist } from '../pages';
+import { AnnualRecurring, MonthlyRecurring, WeeklyRecurring, DailyRecurring } from '../pages/recurring';
 
 /**
  * Application router configuration.
@@ -34,6 +35,10 @@ export const router = createBrowserRouter([
           { path: 'monthly', element: <MonthlyBacklog /> },
           { path: 'weekly', element: <WeeklySprint /> },
           { path: 'daily', element: <DailyChecklist /> },
+          { path: 'recurring/annual', element: <AnnualRecurring /> },
+          { path: 'recurring/monthly', element: <MonthlyRecurring /> },
+          { path: 'recurring/weekly', element: <WeeklyRecurring /> },
+          { path: 'recurring/daily', element: <DailyRecurring /> },
         ],
       },
     ],

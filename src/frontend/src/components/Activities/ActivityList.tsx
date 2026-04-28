@@ -3,12 +3,14 @@ import './ActivityList.css';
 
 interface ActivityListProps {
   activities: Activity[];
-  containerType: ContainerType;
+  containerType?: ContainerType;
   onActivityClick?: (activity: Activity) => void;
   onEditActivity?: (activity: Activity) => void;
   onMoveActivity?: (activity: Activity) => void;
   onActivityDelete?: (activityId: number) => void;
   onToggleCompletion?: (activityId: number, containerId: number, isCompleted: boolean) => void;
+  onReorder?: (activityId: number, containerId: number, direction: 'up' | 'down') => void;
+  onAddChild?: (parent: Activity) => void;
 }
 
 const activityTypeLabels: Record<number, string> = {
@@ -25,7 +27,7 @@ const activityTypeColors: Record<number, string> = {
   [ActivityType.Task]: '#4caf50',
 };
 
-export function ActivityList({ activities, containerType, onActivityClick, onEditActivity, onMoveActivity, onActivityDelete, onToggleCompletion }: ActivityListProps) {
+export function ActivityList({ activities, containerType, onActivityClick, onEditActivity, onMoveActivity, onActivityDelete, onToggleCompletion, onReorder, onAddChild }: ActivityListProps) {
   const handleDelete = (e: React.MouseEvent, activityId: number) => {
     e.stopPropagation(); // Prevent triggering onClick
     if (window.confirm('Are you sure you want to delete this activity? This cannot be undone.')) {
@@ -43,21 +45,41 @@ export function ActivityList({ activities, containerType, onActivityClick, onEdi
     onMoveActivity?.(activity);
   };
 
+  const handleReorder = (e: React.MouseEvent, activity: Activity, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    const container = containerType !== undefined
+      ? activity.containers.find(c => c.containerType === containerType)
+      : activity.containers[0];
+    if (container && onReorder) {
+      onReorder(activity.id, container.containerId, direction);
+    }
+  };
+
+  const handleAddChild = (e: React.MouseEvent, activity: Activity) => {
+    e.stopPropagation();
+    onAddChild?.(activity);
+  };
+
   const handleToggleCompletion = (e: React.ChangeEvent<HTMLInputElement>, activity: Activity) => {
     e.stopPropagation(); // Prevent triggering onClick
-    const container = activity.containers.find(c => c.containerType === containerType);
+    const container = containerType !== undefined
+      ? activity.containers.find(c => c.containerType === containerType)
+      : activity.containers[0];
     if (container && onToggleCompletion) {
       const isCompleted = e.target.checked;
       onToggleCompletion(activity.id, container.containerId, isCompleted);
     }
   };
-  // Filter activities that belong to the selected container type
-  const filteredActivities = activities.filter((activity) =>
-    activity.containers.some((container) => container.containerType === containerType)
-  );
+  // Filter activities that belong to the selected container type (skip filter when no containerType)
+  const filteredActivities = containerType !== undefined
+    ? activities.filter((activity) =>
+        activity.containers.some((container) => container.containerType === containerType)
+      )
+    : activities;
 
-  // Sort by order within the container
-  const sortedActivities = filteredActivities.sort((a, b) => {
+  // Sort by order within the container (or by creation order if no containerType)
+  const sortedActivities = [...filteredActivities].sort((a, b) => {
+    if (containerType === undefined) return 0;
     const aContainer = a.containers.find((c) => c.containerType === containerType);
     const bContainer = b.containers.find((c) => c.containerType === containerType);
     return (aContainer?.order || 0) - (bContainer?.order || 0);
@@ -74,8 +96,10 @@ export function ActivityList({ activities, containerType, onActivityClick, onEdi
 
   return (
     <div className="activity-list">
-      {sortedActivities.map((activity) => {
-        const container = activity.containers.find(c => c.containerType === containerType);
+      {sortedActivities.map((activity, index) => {
+        const container = containerType !== undefined
+          ? activity.containers.find(c => c.containerType === containerType)
+          : activity.containers[0];
         const isCompleted = !!container?.completedAt;
 
         return (
@@ -128,6 +152,35 @@ export function ActivityList({ activities, containerType, onActivityClick, onEdi
           )}
 
             <div className="activity-actions">
+              {onReorder && (
+                <>
+                  <button
+                    className="reorder-up-button"
+                    onClick={(e) => handleReorder(e, activity, 'up')}
+                    disabled={index === 0}
+                    title="Move up"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    className="reorder-down-button"
+                    onClick={(e) => handleReorder(e, activity, 'down')}
+                    disabled={index === sortedActivities.length - 1}
+                    title="Move down"
+                  >
+                    ▼
+                  </button>
+                </>
+              )}
+              {onAddChild && activity.type !== ActivityType.Task && (
+                <button
+                  className="add-child-button"
+                  onClick={(e) => handleAddChild(e, activity)}
+                  title="Add child item"
+                >
+                  Add
+                </button>
+              )}
               {onEditActivity && (
                 <button
                   className="edit-button"

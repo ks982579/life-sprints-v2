@@ -5,6 +5,7 @@ import { ActivityEditor } from '../components/Activities/ActivityEditor';
 import { ActivityDetailModal } from '../components/Activities/ActivityDetailModal';
 import { MoveActivityModal } from '../components/Activities/MoveActivityModal';
 import { NewContainerModal } from '../components/Activities/NewContainerModal';
+import { AddChildModal } from '../components/Activities/AddChildModal';
 import { DateNavigator } from '../components/Navigation/DateNavigator';
 import { activityService } from '../services/activityService';
 import { containerService } from '../services/containerService';
@@ -24,6 +25,7 @@ export function MonthlyBacklog() {
     handleDelete,
     handleToggle,
     reload,
+    reloadContainers,
   } = useBacklog(ContainerType.Monthly);
 
   const [showEditor, setShowEditor] = useState(false);
@@ -69,9 +71,18 @@ export function MonthlyBacklog() {
     setShowEditor(!showEditor);
   };
 
-  const handleContainerCreated = async () => {
-    setShowNewContainer(false);
+  const handleReorder = async (activityId: number, containerId: number, direction: 'up' | 'down') => {
+    await activityService.reorderActivity(activityId, containerId, direction);
     await reload();
+  };
+
+  const [addChildParent, setAddChildParent] = useState<Activity | null>(null);
+
+  const handleContainerCreated = async (newContainer: Container) => {
+    setShowNewContainer(false);
+    await reloadContainers();
+    await reload();
+    setSelectedContainerId(newContainer.id);
     const updated = await containerService.getContainers();
     setAllContainers(updated);
   };
@@ -105,6 +116,7 @@ export function MonthlyBacklog() {
           editingActivity={editingActivity}
           onSave={handleSave}
           onCancel={handleCancelEditor}
+          hideRecurring
         />
       )}
 
@@ -119,6 +131,8 @@ export function MonthlyBacklog() {
           onMoveActivity={setMoveActivity}
           onActivityDelete={handleDelete}
           onToggleCompletion={handleToggle}
+          onReorder={handleReorder}
+          onAddChild={setAddChildParent}
         />
       )}
 
@@ -149,6 +163,16 @@ export function MonthlyBacklog() {
           label="Month"
           onCreated={handleContainerCreated}
           onClose={() => setShowNewContainer(false)}
+        />
+      )}
+
+      {addChildParent && (
+        <AddChildModal
+          parent={addChildParent}
+          onSave={async (data) => {
+            await handleCreate({ ...data, containerId: selectedContainerId, defaultContainerType: ContainerType.Monthly });
+          }}
+          onClose={() => setAddChildParent(null)}
         />
       )}
     </div>

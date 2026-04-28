@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { type ContainerType } from '../../types';
+import { type ContainerType, type Container } from '../../types';
 import { containerService } from '../../services/containerService';
 import styles from './NewContainerModal.module.css';
 
 interface NewContainerModalProps {
   containerType: ContainerType;
   label: string; // e.g. "Sprint", "Month", "Year"
-  onCreated: () => void;
+  onCreated: (container: Container) => void;
   onClose: () => void;
 }
 
@@ -27,8 +27,8 @@ export function NewContainerModal({ containerType, label, onCreated, onClose }: 
     try {
       setLoading(true);
       setError(null);
-      await containerService.createNewContainer({ type: containerType, rolloverIncomplete: rollover });
-      onCreated();
+      const created = await containerService.createNewContainer({ type: containerType, rolloverIncomplete: rollover });
+      onCreated(created);
     } catch (err) {
       const e = err as Error & { conflict?: boolean };
       if (e.conflict) {

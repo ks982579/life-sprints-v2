@@ -60,6 +60,9 @@ Getting this right prevents major confusion. There are two layers: what users se
 | `IsRolledOver` | Flag on `ContainerActivity` — true if the item was carried forward from a previous container |
 | `ArchivedAt` | Soft-delete timestamp on `ActivityTemplate`. Archived items are hidden from all queries. |
 | `DefaultContainerType` | Field on `CreateActivityDto` — the fallback container type when no `ContainerId` is provided |
+| `SkipContainerLink` | Field on `CreateActivityDto` — when `true`, no `ContainerActivity` is created; used for recurring templates that should not belong to any container |
+| Recurring template | An `ActivityTemplate` with `IsRecurring=true` and a `RecurrenceType` set. Has no `ContainerActivity` records. Auto-instantiates as a concrete copy (with a stamped title) when a matching container is created. |
+| Concrete instance | An `ActivityTemplate` created by instantiating a recurring template. Has a stamped title (e.g., "Pay Bills \| April 2026") and normal `ContainerActivity` links. |
 
 ---
 
@@ -101,6 +104,8 @@ When an item is added to any container — either at creation time or via the "A
 
 This is enforced in `ActivityService.CreateActivityAsync` and `ActivityService.AddActivityToContainerAsync` via `GetParentContainerTypes()`.
 
+**Exception**: recurring templates pass `SkipContainerLink=true`, so no propagation occurs. Concrete instances created from recurring templates do auto-propagate normally.
+
 ### Shared Completion State
 
 Toggling an item's completion checkbox in any backlog marks it complete (or incomplete) **in all backlogs simultaneously**. This is handled in `ActivityService.ToggleActivityCompletionAsync`, which updates every `ContainerActivity` record for that item owned by the user.
@@ -132,6 +137,8 @@ Containers are **not created automatically on login**. They are created in two w
    - If it **does** → returns `409 Conflict` (the UI shows a warning in the modal)
    - If it **doesn't** → creates the container, optionally rolling over incomplete items from the most recent previous container of the same type
 
+After creating a container (either path), `ContainerService.InstantiateRecurringItemsAsync` fires automatically. It finds all recurring templates for the user whose `RecurrenceType` matches the new container's `ContainerType`, then creates concrete copies (with stamped titles) linked to the new container with auto-propagation upward. Parent templates are instantiated before children via topological sort.
+
 ### Container Date Ranges
 
 Calculated by `ContainerService.GetDateRangeForType()`:
@@ -153,12 +160,13 @@ All dates are stored as UTC (`DateTimeKind.Utc`). Never use `DateTime.Unspecifie
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/activities` | Get all items for the user. `?containerType=N` or `?containerId=N` to filter |
+| GET | `/api/activities` | Get all items for the user. `?containerType=N` or `?containerId=N` to filter; `?isRecurring=true` or `?recurrenceType=N` for recurring template queries |
 | GET | `/api/activities/{id}` | Get one item (404 if archived) |
 | POST | `/api/activities` | Create a new item. Body: `CreateActivityDto` |
 | PUT | `/api/activities/{id}` | Update item metadata |
 | DELETE | `/api/activities/{id}` | Soft-delete (archive) an item |
 | PATCH | `/api/activities/{id}/complete` | Toggle completion in a specific container (updates all containers) |
+| PATCH | `/api/activities/{id}/reorder` | Move item up or down within a container. Body: `{ containerId, direction: "up"\|"down" }`. Returns 204. |
 | POST | `/api/activities/{id}/containers/{containerId}` | Add item to an additional container (propagates upward) |
 | DELETE | `/api/activities/{id}/containers/{containerId}` | Remove item from a specific container |
 
@@ -167,6 +175,7 @@ All dates are stored as UTC (`DateTimeKind.Utc`). Never use `DateTime.Unspecifie
 - `isRecurring`, `recurrenceType`
 - `containerId` — specific container to add to (takes precedence)
 - `defaultContainerType` — fallback container type when `containerId` is null; defaults to Annual if omitted
+- `skipContainerLink` — when `true`, no `ContainerActivity` is created (used for recurring templates)
 
 ### Containers
 
@@ -206,18 +215,31 @@ Returns `409 Conflict` if a container already exists for the current period.
 | `WeeklySprint.tsx` | Weekly (2) | New Sprint | |
 | `DailyChecklist.tsx` | Daily (3) | — | No `NewContainerModal` or `MoveActivityModal` — daily containers are created implicitly |
 
-All four pages use the `useBacklog(containerType)` hook. The annual, monthly, and weekly pages fetch all containers for `MoveActivityModal`; the daily page omits this since items flow down into daily, not out.
+All four pages use the `useBacklog(containerType)` hook. The annual, monthly, and weekly pages fetch all containers for `MoveActivityModal`; the daily page omits this since items flow down into daily, not out. All four pass `hideRecurring` to `ActivityEditor` so recurring fields are hidden in backlog pages.
+
+### Recurring Item Pages
+
+| Page component | RecurrenceType | Route |
+|---|---|---|
+| `pages/recurring/AnnualRecurring.tsx` | Annual (0) | `/recurring/annual` |
+| `pages/recurring/MonthlyRecurring.tsx` | Monthly (1) | `/recurring/monthly` |
+| `pages/recurring/WeeklyRecurring.tsx` | Weekly (2) | `/recurring/weekly` |
+| `pages/recurring/DailyRecurring.tsx` | Daily (3) | `/recurring/daily` |
+
+Recurring pages use `useRecurringItems(recurrenceType)` instead of `useBacklog`. They render `ActivityList` without a `containerType` prop (because recurring templates have no container links) and `ActivityEditor` with `fixedIsRecurring={true}` and the fixed `recurrenceType` so users cannot change these fields. All creates pass `skipContainerLink: true`.
 
 ### Key Components
 
 | Component | Purpose |
 |---|---|
-| `useBacklog(type)` | Custom hook: loads containers + activities, exposes CRUD callbacks |
+| `useBacklog(type)` | Custom hook: loads containers + activities, exposes CRUD callbacks + `reloadContainers` |
+| `useRecurringItems(recurrenceType)` | Custom hook for recurring pages: fetches templates with `isRecurring: true`, always passes `skipContainerLink: true` on create |
 | `DateNavigator` | Lets user navigate to historical containers of the same type |
-| `ActivityEditor` | Form for creating/editing an item; filters valid parent options by selected type |
-| `ActivityList` | Renders items with completion checkbox, edit/move/delete actions; sorts by `Order` within container |
+| `ActivityEditor` | Form for creating/editing an item; `hideRecurring` hides recurring fields; `fixedIsRecurring`/`fixedRecurrenceType` lock those fields |
+| `ActivityList` | Renders items with completion checkbox, reorder (▲/▼), edit/move/delete, and "Add" (child) actions. `containerType` is optional — omit for recurring pages |
+| `AddChildModal` | Modal to add a child item to a Project/Epic/Story; maps parent type to correct child type (Project→Epic, Epic→Story, Story→Task) |
 | `MoveActivityModal` | "Add to Backlog" — shows all non-archived containers grouped by type |
-| `NewContainerModal` | "New Sprint / Month / Year" — rollover choice, calls `POST /containers/new` |
+| `NewContainerModal` | "New Sprint / Month / Year" — rollover choice, calls `POST /containers/new`; `onCreated` callback now receives the created `Container` object |
 | `ActivityDetailModal` | Read-only detail view |
 | `ContainerSelector` | Dropdown to switch between containers of the same type (used within pages) |
 
@@ -226,11 +248,11 @@ All four pages use the `useBacklog(containerType)` hook. The annual, monthly, an
 Manages state for a single backlog page:
 - Loads all containers of the given type (for `DateNavigator`)
 - Loads activities filtered by `selectedContainerId` (or by `containerType` when no container is selected)
-- Exposes `handleCreate`, `handleUpdate`, `handleDelete`, `handleToggle`, `reload`
+- Exposes `handleCreate`, `handleUpdate`, `handleDelete`, `handleToggle`, `reload`, `reloadContainers`
 
 `selectedContainerId` starts as `undefined`. Each page passes `defaultContainerType` in create calls so the backend resolves the right container even before the user has navigated to a specific container.
 
-**Important**: `reload` only reloads activities, not the containers list. When a new container is created via `NewContainerModal`, the page must separately call `containerService.getContainers()` to refresh the containers in state — the hook's `containers` state will not auto-update. See `handleContainerCreated` in `AnnualBacklog.tsx`.
+**Important**: `reload` only reloads activities; `reloadContainers` reloads the containers list. After `NewContainerModal` calls `onCreated(newContainer)`, pages must call `reloadContainers()` → `reload()` → `setSelectedContainerId(newContainer.id)` to update `DateNavigator` without a page reload.
 
 ### All-Containers for the Move Modal
 
@@ -361,11 +383,12 @@ src/
     └── src/
         ├── components/
         │   ├── Activities/      # ActivityList, ActivityEditor, ActivityDetailModal,
-        │   │                    # MoveActivityModal, NewContainerModal, BacklogTabs
+        │   │                    # MoveActivityModal, NewContainerModal, AddChildModal, BacklogTabs
         │   ├── Navigation/      # DateNavigator
         │   └── Auth/            # LoginPage, ProtectedRoute
-        ├── hooks/               # useBacklog
-        ├── pages/               # AnnualBacklog, MonthlyBacklog, WeeklySprint
+        ├── hooks/               # useBacklog, useRecurringItems
+        ├── pages/               # AnnualBacklog, MonthlyBacklog, WeeklySprint, DailyChecklist
+        │   └── recurring/       # AnnualRecurring, MonthlyRecurring, WeeklyRecurring, DailyRecurring
         ├── services/            # activityService, containerService, api
         ├── types/               # activity.ts — all TypeScript types
         └── context/             # AuthContext
@@ -418,7 +441,17 @@ src/
 
 12. **The toggle endpoint is `/complete`, not `/toggle`.** The controller action is `PATCH /api/activities/{id}/complete`. The CLAUDE.md previously listed it incorrectly as `/toggle`. The frontend `activityService.toggleCompletion` correctly calls `/complete`.
 
-13. **`useBacklog` containers list does not auto-refresh after `NewContainerModal` creates a container.** Pages that render `NewContainerModal` must call `containerService.getContainers()` inside their `onCreated` callback (in addition to calling `reload()`) to update the `DateNavigator`. Without this, the new container only appears after a page reload.
+13. **`useBacklog` containers list does not auto-refresh on its own.** After `NewContainerModal` creates a container, pages call `reloadContainers()` (exposed by the hook) then `reload()` then `setSelectedContainerId(newContainer.id)`. `NewContainerModal.onCreated` now receives the created `Container` object — don't change it back to `() => void`.
+
+14. **`ActivityList.containerType` is optional for recurring pages.** Recurring templates have no `ContainerActivity` records, so passing a `containerType` filter to `ActivityList` would result in an empty list. When `containerType` is `undefined`, the component skips container-based filtering and completion lookups.
+
+15. **`api.patch` returns 204 for the reorder endpoint.** The `PATCH /api/activities/{id}/reorder` action returns `NoContent()`. `api.patch` handles this by checking the status code and returning `undefined as T` — the same pattern as `api.post`. Do not remove that check.
+
+16. **Recurring templates must never have `ContainerActivity` records.** Always pass `skipContainerLink: true` when creating them. `useRecurringItems` enforces this automatically. If a recurring template acquires a container link, it will appear in backlog pages unexpectedly and also be double-counted when a new container is created.
+
+17. **`BuildStampedTitle` uses Sunday as the week label.** For weekly containers, the stamped title uses `container.StartDate.AddDays(-1)` (i.e., the Sunday before the Mon–Sun week) to match the "week of Sunday" convention. For example, a week starting 2026-04-27 (Monday) gets the label "Week of 2026-04-26".
+
+18. **`RecurrenceType` backend values differ from what was once in the frontend.** The fixed mapping is: `Annual=0, Monthly=1, Weekly=2, Daily=3, None=99`. The DB stores enum names as strings (`HasConversion<string>()`), so no migration is needed if only the numeric values change — but never reorder the enum names.
 
 ---
 

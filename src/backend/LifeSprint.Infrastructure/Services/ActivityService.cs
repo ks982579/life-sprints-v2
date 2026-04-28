@@ -65,58 +65,61 @@ public class ActivityService : IActivityService
         _context.ActivityTemplates.Add(activityTemplate);
         await _context.SaveChangesAsync(); // Save to get the ID
 
-        // Determine which container to add the activity to
-        Container container;
-        if (dto.ContainerId.HasValue)
+        if (!dto.SkipContainerLink)
         {
-            // Use specified container (with authorization check)
-            var specifiedContainer = await _context.Containers
-                .FirstOrDefaultAsync(c => c.Id == dto.ContainerId.Value && c.UserId == userId);
-            if (specifiedContainer == null)
+            // Determine which container to add the activity to
+            Container container;
+            if (dto.ContainerId.HasValue)
             {
-                throw new UnauthorizedAccessException($"Container {dto.ContainerId} not found or unauthorized");
-            }
-            container = specifiedContainer;
-        }
-        else
-        {
-            // Use provided ContainerType, or fall back to Annual
-            var fallbackType = dto.DefaultContainerType ?? ContainerType.Annual;
-            container = await _containerService.GetOrCreateCurrentContainerAsync(userId, fallbackType);
-        }
-
-        // Create the container-activity association for the target container
-        var containerActivity = new ContainerActivity
-        {
-            ContainerId = container.Id,
-            ActivityTemplateId = activityTemplate.Id,
-            AddedAt = DateTime.UtcNow,
-            Order = await GetNextOrderInContainerAsync(container.Id),
-            IsRolledOver = false
-        };
-
-        _context.ContainerActivities.Add(containerActivity);
-
-        // Auto-propagate to parent containers (Weekly → Monthly → Annual, etc.)
-        foreach (var parentType in GetParentContainerTypes(container.Type))
-        {
-            var parentContainer = await _containerService.GetOrCreateCurrentContainerAsync(userId, parentType);
-            var alreadyLinked = await _context.ContainerActivities
-                .AnyAsync(ca => ca.ActivityTemplateId == activityTemplate.Id && ca.ContainerId == parentContainer.Id);
-            if (!alreadyLinked)
-            {
-                _context.ContainerActivities.Add(new ContainerActivity
+                // Use specified container (with authorization check)
+                var specifiedContainer = await _context.Containers
+                    .FirstOrDefaultAsync(c => c.Id == dto.ContainerId.Value && c.UserId == userId);
+                if (specifiedContainer == null)
                 {
-                    ContainerId = parentContainer.Id,
-                    ActivityTemplateId = activityTemplate.Id,
-                    AddedAt = DateTime.UtcNow,
-                    Order = await GetNextOrderInContainerAsync(parentContainer.Id),
-                    IsRolledOver = false
-                });
+                    throw new UnauthorizedAccessException($"Container {dto.ContainerId} not found or unauthorized");
+                }
+                container = specifiedContainer;
             }
-        }
+            else
+            {
+                // Use provided ContainerType, or fall back to Annual
+                var fallbackType = dto.DefaultContainerType ?? ContainerType.Annual;
+                container = await _containerService.GetOrCreateCurrentContainerAsync(userId, fallbackType);
+            }
 
-        await _context.SaveChangesAsync();
+            // Create the container-activity association for the target container
+            var containerActivity = new ContainerActivity
+            {
+                ContainerId = container.Id,
+                ActivityTemplateId = activityTemplate.Id,
+                AddedAt = DateTime.UtcNow,
+                Order = await GetNextOrderInContainerAsync(container.Id),
+                IsRolledOver = false
+            };
+
+            _context.ContainerActivities.Add(containerActivity);
+
+            // Auto-propagate to parent containers (Weekly → Monthly → Annual, etc.)
+            foreach (var parentType in GetParentContainerTypes(container.Type))
+            {
+                var parentContainer = await _containerService.GetOrCreateCurrentContainerAsync(userId, parentType);
+                var alreadyLinked = await _context.ContainerActivities
+                    .AnyAsync(ca => ca.ActivityTemplateId == activityTemplate.Id && ca.ContainerId == parentContainer.Id);
+                if (!alreadyLinked)
+                {
+                    _context.ContainerActivities.Add(new ContainerActivity
+                    {
+                        ContainerId = parentContainer.Id,
+                        ActivityTemplateId = activityTemplate.Id,
+                        AddedAt = DateTime.UtcNow,
+                        Order = await GetNextOrderInContainerAsync(parentContainer.Id),
+                        IsRolledOver = false
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+        }
 
         // Return the created activity with container associations
         return await GetActivityByIdAsync(userId, activityTemplate.Id)
@@ -124,10 +127,10 @@ public class ActivityService : IActivityService
     }
 
     /// <summary>
-    /// Gets all non-archived activities for a user, optionally filtered by container type or container ID.
+    /// Gets all non-archived activities for a user, optionally filtered by container type, container ID, or recurring flags.
     /// When containerId is provided it takes precedence over containerType.
     /// </summary>
-    public async Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null, int? containerId = null)
+    public async Task<List<ActivityResponseDto>> GetActivitiesForUserAsync(string userId, ContainerType? containerType = null, int? containerId = null, bool? isRecurring = null, RecurrenceType? recurrenceType = null)
     {
         var query = _context.ActivityTemplates
             .Where(at => at.UserId == userId && at.ArchivedAt == null)
@@ -148,6 +151,12 @@ public class ActivityService : IActivityService
             query = query.Where(at =>
                 at.ContainerActivities.Any(ca => ca.Container.Type == containerType.Value));
         }
+
+        if (isRecurring.HasValue)
+            query = query.Where(at => at.IsRecurring == isRecurring.Value);
+
+        if (recurrenceType.HasValue)
+            query = query.Where(at => at.RecurrenceType == recurrenceType.Value);
 
         var activities = await query
             .OrderByDescending(at => at.CreatedAt)
@@ -435,6 +444,40 @@ public class ActivityService : IActivityService
 
         // Return the updated activity with all associations
         return await GetActivityByIdAsync(userId, activityId);
+    }
+
+    /// <summary>
+    /// Reorders an activity within a container by swapping its Order with the adjacent item.
+    /// </summary>
+    public async Task<bool> ReorderActivityAsync(string userId, int activityId, int containerId, string direction)
+    {
+        if (direction != "up" && direction != "down")
+            return false;
+
+        var targetCa = await _context.ContainerActivities
+            .Include(ca => ca.Container)
+            .FirstOrDefaultAsync(ca => ca.ActivityTemplateId == activityId && ca.ContainerId == containerId);
+
+        if (targetCa == null || targetCa.Container.UserId != userId)
+            return false;
+
+        var allInContainer = await _context.ContainerActivities
+            .Where(ca => ca.ContainerId == containerId)
+            .OrderBy(ca => ca.Order)
+            .ToListAsync();
+
+        var index = allInContainer.FindIndex(ca => ca.ActivityTemplateId == activityId);
+
+        if (direction == "up" && index == 0) return false;
+        if (direction == "down" && index == allInContainer.Count - 1) return false;
+
+        var neighborIndex = direction == "up" ? index - 1 : index + 1;
+        var neighbor = allInContainer[neighborIndex];
+
+        (allInContainer[index].Order, neighbor.Order) = (neighbor.Order, allInContainer[index].Order);
+
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     /// <summary>

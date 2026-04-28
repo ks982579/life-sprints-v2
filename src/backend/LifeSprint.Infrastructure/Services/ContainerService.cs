@@ -4,6 +4,7 @@ using LifeSprint.Core.Interfaces;
 using LifeSprint.Core.Models;
 using LifeSprint.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace LifeSprint.Infrastructure.Services;
 
@@ -60,6 +61,8 @@ public class ContainerService : IContainerService
 
         _context.Containers.Add(newContainer);
         await _context.SaveChangesAsync();
+
+        await InstantiateRecurringItemsAsync(userId, newContainer);
 
         return newContainer;
     }
@@ -192,6 +195,8 @@ public class ContainerService : IContainerService
             await _context.SaveChangesAsync();
         }
 
+        await InstantiateRecurringItemsAsync(userId, newContainer);
+
         return await GetContainerAsync(userId, newContainer.Id);
     }
 
@@ -252,6 +257,134 @@ public class ContainerService : IContainerService
         var endDate = startDate.AddDays(6);
 
         return (startDate, endDate);
+    }
+
+    /// <summary>
+    /// Builds the stamped title for a concrete recurring instance (e.g., "Pay Bills | April 2026").
+    /// Weekly containers use StartDate - 1 day to display the Sunday of the week.
+    /// </summary>
+    private static string BuildStampedTitle(string baseTitle, Container container)
+    {
+        return container.Type switch
+        {
+            ContainerType.Annual => $"{baseTitle} | {container.StartDate.Year}",
+            ContainerType.Monthly => $"{baseTitle} | {container.StartDate.ToString("MMMM yyyy", CultureInfo.CurrentCulture)}",
+            ContainerType.Weekly => $"{baseTitle} | Week of {container.StartDate.AddDays(-1):yyyy-MM-dd}",
+            ContainerType.Daily => $"{baseTitle} | {container.StartDate:yyyy-MM-dd}",
+            _ => baseTitle
+        };
+    }
+
+    /// <summary>
+    /// Instantiates recurring templates matching the container's type into concrete stamped copies.
+    /// Skips templates that already have a concrete instance in this container (idempotent).
+    /// Handles parent-child recurring relationships via topological ordering.
+    /// </summary>
+    private async Task InstantiateRecurringItemsAsync(string userId, Container newContainer)
+    {
+        var matchingRecurrenceType = newContainer.Type switch
+        {
+            ContainerType.Annual => RecurrenceType.Annual,
+            ContainerType.Monthly => RecurrenceType.Monthly,
+            ContainerType.Weekly => RecurrenceType.Weekly,
+            ContainerType.Daily => RecurrenceType.Daily,
+            _ => (RecurrenceType?)null
+        };
+
+        if (matchingRecurrenceType == null) return;
+
+        var templates = await _context.ActivityTemplates
+            .Where(at => at.UserId == userId && at.IsRecurring && at.RecurrenceType == matchingRecurrenceType && at.ArchivedAt == null)
+            .OrderBy(at => at.Id)
+            .ToListAsync();
+
+        if (!templates.Any()) return;
+
+        // Topological ordering: parents before children
+        var ordered = TopologicalSort(templates);
+
+        // Map from template ID → concrete instance ID (for child parent resolution)
+        var templateToConcrete = new Dictionary<int, int>();
+
+        foreach (var template in ordered)
+        {
+            var stampedTitle = BuildStampedTitle(template.Title, newContainer);
+
+            // Skip if already instantiated in this container
+            var alreadyExists = await _context.ActivityTemplates
+                .AnyAsync(at => at.UserId == userId && at.Title == stampedTitle
+                    && at.ContainerActivities.Any(ca => ca.ContainerId == newContainer.Id));
+            if (alreadyExists) continue;
+
+            // Resolve concrete parent ID if the template has a parent
+            int? concreteParentId = null;
+            if (template.ParentActivityId.HasValue && templateToConcrete.TryGetValue(template.ParentActivityId.Value, out var mappedParentId))
+            {
+                concreteParentId = mappedParentId;
+            }
+
+            var concreteInstance = new ActivityTemplate
+            {
+                UserId = userId,
+                Title = stampedTitle,
+                Description = template.Description,
+                Type = template.Type,
+                ParentActivityId = concreteParentId,
+                IsRecurring = false,
+                RecurrenceType = RecurrenceType.None,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.ActivityTemplates.Add(concreteInstance);
+            await _context.SaveChangesAsync();
+
+            templateToConcrete[template.Id] = concreteInstance.Id;
+
+            var order = await GetNextOrderInContainerAsync(newContainer.Id);
+            _context.ContainerActivities.Add(new ContainerActivity
+            {
+                ContainerId = newContainer.Id,
+                ActivityTemplateId = concreteInstance.Id,
+                AddedAt = DateTime.UtcNow,
+                Order = order,
+                IsRolledOver = false
+            });
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Returns a topologically sorted list of templates (parents before children).
+    /// Templates without a parent in the list come first.
+    /// </summary>
+    private static List<ActivityTemplate> TopologicalSort(List<ActivityTemplate> templates)
+    {
+        var idSet = templates.ToDictionary(t => t.Id);
+        var result = new List<ActivityTemplate>();
+        var visited = new HashSet<int>();
+
+        void Visit(ActivityTemplate t)
+        {
+            if (visited.Contains(t.Id)) return;
+            visited.Add(t.Id);
+            if (t.ParentActivityId.HasValue && idSet.TryGetValue(t.ParentActivityId.Value, out var parent))
+                Visit(parent);
+            result.Add(t);
+        }
+
+        foreach (var t in templates) Visit(t);
+        return result;
+    }
+
+    /// <summary>
+    /// Gets the next order value for activities in a container.
+    /// </summary>
+    private async Task<int> GetNextOrderInContainerAsync(int containerId)
+    {
+        var maxOrder = await _context.ContainerActivities
+            .Where(ca => ca.ContainerId == containerId)
+            .MaxAsync(ca => (int?)ca.Order);
+        return (maxOrder ?? 0) + 1;
     }
 
     /// <summary>

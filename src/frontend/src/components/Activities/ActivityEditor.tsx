@@ -14,6 +14,9 @@ interface ActivityEditorProps {
     recurrenceType: RecurrenceType;
   }) => void;
   onCancel: () => void;
+  fixedIsRecurring?: boolean;
+  fixedRecurrenceType?: RecurrenceType;
+  hideRecurring?: boolean;
 }
 
 const activityTypeOptions = [
@@ -39,13 +42,13 @@ const validParentTypes: Record<number, ActivityType[]> = {
   [ActivityType.Task]: [ActivityType.Story, ActivityType.Epic],
 };
 
-export function ActivityEditor({ activities, editingActivity, onSave, onCancel }: ActivityEditorProps) {
+export function ActivityEditor({ activities, editingActivity, onSave, onCancel, fixedIsRecurring, fixedRecurrenceType, hideRecurring }: ActivityEditorProps) {
   const [title, setTitle] = useState(editingActivity?.title || '');
   const [description, setDescription] = useState(editingActivity?.description || '');
   const [type, setType] = useState<ActivityType>(editingActivity?.type || ActivityType.Task);
   const [parentActivityId, setParentActivityId] = useState<number | undefined>(editingActivity?.parentActivityId);
-  const [isRecurring, setIsRecurring] = useState(editingActivity?.isRecurring || false);
-  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(editingActivity?.recurrenceType || RecurrenceType.None);
+  const [isRecurring, setIsRecurring] = useState(fixedIsRecurring ?? editingActivity?.isRecurring ?? false);
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>(fixedRecurrenceType ?? editingActivity?.recurrenceType ?? RecurrenceType.None);
 
   // Get potential parent activities based on selected type
   // When editing, exclude the current activity itself and its descendants
@@ -163,24 +166,28 @@ export function ActivityEditor({ activities, editingActivity, onSave, onCancel }
           </div>
         )}
 
-        <div className="form-group checkbox-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={isRecurring}
-              onChange={(e) => setIsRecurring(e.target.checked)}
-            />
-            <span>Recurring Activity</span>
-          </label>
-        </div>
+        {!hideRecurring && (
+          <div className="form-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                disabled={fixedIsRecurring !== undefined}
+              />
+              <span>Recurring Activity</span>
+            </label>
+          </div>
+        )}
 
-        {isRecurring && (
+        {!hideRecurring && isRecurring && (
           <div className="form-group">
             <label htmlFor="recurrence-type">Recurrence Type</label>
             <select
               id="recurrence-type"
               value={recurrenceType}
               onChange={(e) => setRecurrenceType(Number(e.target.value) as RecurrenceType)}
+              disabled={fixedRecurrenceType !== undefined}
             >
               {recurrenceOptions
                 .filter((option) => option.value !== RecurrenceType.None)

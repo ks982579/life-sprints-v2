@@ -17,6 +17,7 @@ export interface UseBacklogResult {
   selectedContainerId: number | undefined;
   setSelectedContainerId: (id: number | undefined) => void;
   reload: () => Promise<void>;
+  reloadContainers: () => Promise<void>;
   handleCreate: (data: CreateActivityDto) => Promise<void>;
   handleUpdate: (id: number, data: UpdateActivityDto) => Promise<void>;
   handleDelete: (id: number) => Promise<void>;
@@ -116,6 +117,7 @@ export function useBacklog(containerType: ContainerType): UseBacklogResult {
     selectedContainerId,
     setSelectedContainerId,
     reload,
+    reloadContainers: loadContainers,
     handleCreate,
     handleUpdate,
     handleDelete,
