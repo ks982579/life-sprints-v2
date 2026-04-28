@@ -158,7 +158,7 @@ All dates are stored as UTC (`DateTimeKind.Utc`). Never use `DateTime.Unspecifie
 | POST | `/api/activities` | Create a new item. Body: `CreateActivityDto` |
 | PUT | `/api/activities/{id}` | Update item metadata |
 | DELETE | `/api/activities/{id}` | Soft-delete (archive) an item |
-| PATCH | `/api/activities/{id}/toggle` | Toggle completion in a specific container (updates all containers) |
+| PATCH | `/api/activities/{id}/complete` | Toggle completion in a specific container (updates all containers) |
 | POST | `/api/activities/{id}/containers/{containerId}` | Add item to an additional container (propagates upward) |
 | DELETE | `/api/activities/{id}/containers/{containerId}` | Remove item from a specific container |
 
@@ -191,6 +191,7 @@ Returns `409 Conflict` if a container already exists for the current period.
 | GET | `/api/auth/github/callback` | GitHub callback, sets session cookie |
 | GET | `/api/auth/me` | Get current user info |
 | POST | `/api/auth/logout` | Clear session |
+| POST | `/api/auth/test-login` | Dev/test only — create session without GitHub OAuth. Body: `{ username, email?, avatarUrl? }`. Used by Playwright E2E tests. |
 
 ---
 
@@ -198,13 +199,14 @@ Returns `409 Conflict` if a container already exists for the current period.
 
 ### Pages and Their Backlog Types
 
-| Page component | ContainerType | "New" button label |
-|---|---|---|
-| `AnnualBacklog.tsx` | Annual (0) | New Year |
-| `MonthlyBacklog.tsx` | Monthly (1) | New Month |
-| `WeeklySprint.tsx` | Weekly (2) | New Sprint |
+| Page component | ContainerType | "New" button label | Notes |
+|---|---|---|---|
+| `AnnualBacklog.tsx` | Annual (0) | New Year | |
+| `MonthlyBacklog.tsx` | Monthly (1) | New Month | |
+| `WeeklySprint.tsx` | Weekly (2) | New Sprint | |
+| `DailyChecklist.tsx` | Daily (3) | — | No `NewContainerModal` or `MoveActivityModal` — daily containers are created implicitly |
 
-All three pages share an identical structure using the `useBacklog(containerType)` hook.
+All four pages use the `useBacklog(containerType)` hook. The annual, monthly, and weekly pages fetch all containers for `MoveActivityModal`; the daily page omits this since items flow down into daily, not out.
 
 ### Key Components
 
@@ -212,11 +214,12 @@ All three pages share an identical structure using the `useBacklog(containerType
 |---|---|
 | `useBacklog(type)` | Custom hook: loads containers + activities, exposes CRUD callbacks |
 | `DateNavigator` | Lets user navigate to historical containers of the same type |
-| `ActivityEditor` | Form for creating/editing an item |
-| `ActivityList` | Renders items with completion checkbox, edit/move/delete actions |
+| `ActivityEditor` | Form for creating/editing an item; filters valid parent options by selected type |
+| `ActivityList` | Renders items with completion checkbox, edit/move/delete actions; sorts by `Order` within container |
 | `MoveActivityModal` | "Add to Backlog" — shows all non-archived containers grouped by type |
 | `NewContainerModal` | "New Sprint / Month / Year" — rollover choice, calls `POST /containers/new` |
 | `ActivityDetailModal` | Read-only detail view |
+| `ContainerSelector` | Dropdown to switch between containers of the same type (used within pages) |
 
 ### The `useBacklog` Hook
 
@@ -226,6 +229,8 @@ Manages state for a single backlog page:
 - Exposes `handleCreate`, `handleUpdate`, `handleDelete`, `handleToggle`, `reload`
 
 `selectedContainerId` starts as `undefined`. Each page passes `defaultContainerType` in create calls so the backend resolves the right container even before the user has navigated to a specific container.
+
+**Important**: `reload` only reloads activities, not the containers list. When a new container is created via `NewContainerModal`, the page must separately call `containerService.getContainers()` to refresh the containers in state — the hook's `containers` state will not auto-update. See `handleContainerCreated` in `AnnualBacklog.tsx`.
 
 ### All-Containers for the Move Modal
 
@@ -292,11 +297,17 @@ dotnet ef database update \
 cd src/frontend
 
 npm install
-npm run dev        # Dev server on port 3000
-npm run build      # Production build (also runs tsc)
-npm test           # Vitest unit tests
-npm run test:e2e   # Playwright E2E
+npm run dev              # Dev server on port 3000
+npm run build            # Production build (also runs tsc)
+npm run lint             # ESLint
+npm test                 # Vitest unit tests (run once)
+npm run test:watch       # Vitest in watch mode
+npm run test:e2e         # Playwright E2E (requires docker compose up first)
+npm run test:e2e:ui      # Playwright with interactive UI
+npm run test:e2e:headed  # Playwright with visible browser
 ```
+
+**E2E prerequisite**: Playwright tests hit `http://localhost` (the NGINX proxy). Run `docker compose up -d` from the repo root before running any E2E tests locally. In CI the webServer config in `playwright.config.ts` starts Docker automatically.
 
 ### Docker Compose
 
@@ -404,6 +415,10 @@ src/
 10. **`MoveActivityModal` receives all containers**, not just the current page's type. Each page fetches all containers with `containerService.getContainers()` (no type arg) and passes them to the modal. The modal groups them by type.
 
 11. **Completion is shared across all containers.** `ToggleActivityCompletionAsync` updates every `ContainerActivity` record for the activity, not just the one passed in `containerId`. The `containerId` parameter is only used for authorization verification.
+
+12. **The toggle endpoint is `/complete`, not `/toggle`.** The controller action is `PATCH /api/activities/{id}/complete`. The CLAUDE.md previously listed it incorrectly as `/toggle`. The frontend `activityService.toggleCompletion` correctly calls `/complete`.
+
+13. **`useBacklog` containers list does not auto-refresh after `NewContainerModal` creates a container.** Pages that render `NewContainerModal` must call `containerService.getContainers()` inside their `onCreated` callback (in addition to calling `reload()`) to update the `DateNavigator`. Without this, the new container only appears after a page reload.
 
 ---
 
